@@ -117,7 +117,7 @@ A sample allele is included only if:
 
 1. Record filter is PASS or unset.
 2. Zygosity is not REF.
-3. Zygosity is not NO_CALL (unless include-no-call mode is enabled; current load path still omits NO_CALL rows).
+3. Zygosity is not NO_CALL, unless include-no-call mode is enabled.
 4. `GQ >= gq_threshold` when GQ exists.
 5. `DP >= dp_threshold` when DP exists.
 6. If candidate VRS set provided, `vrs_id` must be in that set.
@@ -143,9 +143,9 @@ Edge behavior:
 
 For shared VRS IDs only:
 
-1. Same genotype string: `1.0`
-2. Different genotype on same VRS ID: `0.5`
-3. NO_CALL in either sample for a shared VRS ID: `0.0`
+1. Matching zygosity on the same VRS ID: `1.0`
+2. Different zygosity on the same VRS ID: `0.5`
+3. `NO_CALL` in either sample for a shared VRS ID: `0.0`
 
 Final score is mean over all shared VRS IDs. If there are no shared IDs, return `0.0`.
 

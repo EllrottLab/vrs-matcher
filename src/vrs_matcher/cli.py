@@ -91,7 +91,13 @@ def match_samples_cmd(sample_a: str, sample_b: str, db: str) -> None:
     type=click.Choice(["all"]),
     help="Comparison target (currently only 'all' is supported).",
 )
-@click.option("--top", default=20, show_default=True, help="Number of top matches to return.")
+@click.option(
+    "--top",
+    default=20,
+    show_default=True,
+    type=click.IntRange(min=1),
+    help="Number of top matches to return.",
+)
 @click.option("--db", required=True, type=click.Path(exists=True), help="Path to SQLite database.")
 def match_sample_cmd(sample_id: str, against: str, top: int, db: str) -> None:
     """Match one sample against all others and print ranked results.

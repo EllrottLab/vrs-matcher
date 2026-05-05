@@ -174,12 +174,15 @@ def _iter_rows(
                     continue
 
                 gt_str = _gt_string(alleles, phased)
-                # For NO_CALL genotypes the allele indexes are unknown; emit a
-                # row for every VRS ID at the locus to record the missing call.
+                # The sample-allele index stores carried alleles only. A
+                # NO_CALL genotype does not identify any carried ALT allele, so
+                # do not emit allele rows for it; otherwise downstream matching
+                # logic can incorrectly treat the sample as carrying every ALT
+                # VRS ID at this locus.
                 if zyg == Zygosity.NO_CALL:
-                    carried = list(vrs_ids)
-                else:
-                    carried = genotype_to_vrs_ids(vrs_ids, alleles)
+                    continue
+
+                carried = genotype_to_vrs_ids(vrs_ids, alleles)
 
                 for vrs_id in dict.fromkeys(carried):  # one row per (sample_id, vrs_id)
                     if candidate_vrs_ids is not None and vrs_id not in candidate_vrs_ids:
