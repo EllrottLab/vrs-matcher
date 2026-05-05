@@ -13,6 +13,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "pytest>=8.3.0",
+  "pytest-cov>=6.0.0",
   "pytest-mock>=3.14.0",
   "ruff>=0.11.0",
 ]
@@ -39,5 +40,11 @@ vrs-matcher = "vrs_matcher.cli:cli"
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra"
+addopts = "-ra --cov=vrs_matcher --cov-report=xml --cov-report=term-missing"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true

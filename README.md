@@ -1,5 +1,8 @@
 # vrs-matcher
 
+[![CI](https://github.com/ohsu-comp-bio/vrs-matcher/actions/workflows/ci.yml/badge.svg)](https://github.com/ohsu-comp-bio/vrs-matcher/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/ohsu-comp-bio/vrs-matcher/graph/badge.svg)](https://codecov.io/gh/ohsu-comp-bio/vrs-matcher)
+
 Match samples based on VRS identifiers.
 
 ## Requirements
