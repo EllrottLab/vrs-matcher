@@ -5,11 +5,16 @@ description = "Match samples based on VRS identifiers"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+  "click>=8.1.0",
+  "cyvcf2>=0.30.0",
+]
 
 [dependency-groups]
 dev = [
   "pytest>=8.3.0",
+  "pytest-cov>=6.0.0",
+  "pytest-mock>=3.14.0",
   "ruff>=0.11.0",
 ]
 
@@ -30,7 +35,16 @@ select = [
   "UP",
 ]
 
+[project.scripts]
+vrs-matcher = "vrs_matcher.cli:cli"
+
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra"
+addopts = "-ra --cov=vrs_matcher --cov-report=xml --cov-report=term-missing"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src"]
+
+[tool.coverage.report]
+show_missing = true

@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # run on pushes to main and development branches
+    branches: [main, development]
   pull_request:
 
 jobs:
@@ -27,3 +28,11 @@ jobs:
 
       - name: Test
         run: uv run pytest
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.xml
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+          slug: ohsu-comp-bio/vrs-matcher
