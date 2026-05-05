@@ -1,0 +1,250 @@
+"""Unit and integration-style tests for loader behavior.
+
+This module validates zygosity inference, genotype-to-VRS mapping, and sample
+loading behavior using mocked ``cyvcf2`` records.
+"""
+
+from unittest.mock import MagicMock, patch
+
+from vrs_matcher.db import get_vrs_ids, open_db
+from vrs_matcher.loader import _zygosity, genotype_to_vrs_ids, load_samples
+from vrs_matcher.models import Zygosity
+
+
+class TestZygosity:
+    """Tests for genotype-to-zygosity inference rules."""
+
+    def test_het(self):
+        """Verify mixed REF/ALT calls are classified as heterozygous.
+
+        Returns:
+            None.
+        """
+
+        assert _zygosity((0, 1)) == Zygosity.HET
+
+    def test_hom_alt(self):
+        """Verify uniform ALT calls are classified as homozygous alternate.
+
+        Returns:
+            None.
+        """
+
+        assert _zygosity((1, 1)) == Zygosity.HOM_ALT
+
+    def test_ref(self):
+        """Verify pure reference calls are classified as reference.
+
+        Returns:
+            None.
+        """
+
+        assert _zygosity((0, 0)) == Zygosity.REF
+
+    def test_no_call_none(self):
+        """Verify all-missing calls using ``None`` are classified as NO_CALL.
+
+        Returns:
+            None.
+        """
+
+        assert _zygosity((None, None)) == Zygosity.NO_CALL
+
+    def test_no_call_negative(self):
+        """Verify all-missing calls using negative values are NO_CALL.
+
+        Returns:
+            None.
+        """
+
+        assert _zygosity((-1, -1)) == Zygosity.NO_CALL
+
+    def test_partial_missing_is_het(self):
+        """Verify partial missing + ALT is classified as heterozygous.
+
+        Returns:
+            None.
+        """
+
+        # ./1 — one allele unknown, one alt → ambiguous, treat as HET
+        assert _zygosity((None, 1)) == Zygosity.HET
+
+    def test_multiallelic_het(self):
+        """Verify two different ALT alleles are classified as heterozygous.
+
+        Returns:
+            None.
+        """
+
+        assert _zygosity((1, 2)) == Zygosity.HET
+
+    def test_haploid_hom_alt(self):
+        """Verify haploid ALT calls are classified as homozygous alternate.
+
+        Returns:
+            None.
+        """
+
+        assert _zygosity((1,)) == Zygosity.HOM_ALT
+
+    def test_haploid_ref(self):
+        """Verify haploid reference calls are classified as reference.
+
+        Returns:
+            None.
+        """
+
+        assert _zygosity((0,)) == Zygosity.REF
+
+
+class TestGenotypeToVrsIds:
+    """Tests for genotype allele-index to VRS-ID mapping."""
+
+    def test_het_single_alt(self):
+        """Verify one ALT allele maps to one VRS ID.
+
+        Returns:
+            None.
+        """
+
+        assert genotype_to_vrs_ids(["ga4gh:VA.abc"], (0, 1)) == ["ga4gh:VA.abc"]
+
+    def test_hom_alt(self):
+        """Verify duplicated ALT alleles map to duplicated VRS IDs.
+
+        Returns:
+            None.
+        """
+
+        assert genotype_to_vrs_ids(["ga4gh:VA.abc"], (1, 1)) == [
+            "ga4gh:VA.abc",
+            "ga4gh:VA.abc",
+        ]
+
+    def test_ref_only_returns_empty(self):
+        """Verify reference-only genotypes produce no carried VRS IDs.
+
+        Returns:
+            None.
+        """
+
+        assert genotype_to_vrs_ids(["ga4gh:VA.abc"], (0, 0)) == []
+
+    def test_missing_call_returns_empty(self):
+        """Verify missing calls produce no carried VRS IDs.
+
+        Returns:
+            None.
+        """
+
+        assert genotype_to_vrs_ids(["ga4gh:VA.abc"], (None, None)) == []
+
+    def test_negative_allele_index_skipped(self):
+        """Verify negative allele indexes are skipped during mapping.
+
+        Returns:
+            None.
+        """
+
+        assert genotype_to_vrs_ids(["ga4gh:VA.abc"], (-1, 1)) == ["ga4gh:VA.abc"]
+
+    def test_multiallelic(self):
+        """Verify multi-ALT genotypes map indexes to corresponding VRS IDs.
+
+        Returns:
+            None.
+        """
+
+        vrs_ids = ["ga4gh:VA.aaa", "ga4gh:VA.bbb"]
+        assert genotype_to_vrs_ids(vrs_ids, (1, 2)) == ["ga4gh:VA.aaa", "ga4gh:VA.bbb"]
+
+    def test_allele_index_out_of_range_skipped(self):
+        """Verify out-of-range ALT indexes are ignored.
+
+        Returns:
+            None.
+        """
+
+        # index 2 → idx=1, but only 1 VRS ID available
+        assert genotype_to_vrs_ids(["ga4gh:VA.abc"], (0, 2)) == []
+
+    def test_empty_vrs_ids(self):
+        """Verify empty VRS ID lists always yield an empty mapping output.
+
+        Returns:
+            None.
+        """
+
+        assert genotype_to_vrs_ids([], (1, 1)) == []
+
+
+def test_load_samples_stores_rows(tmp_path):
+    """Verify load_samples inserts expected rows from a mocked VCF.
+
+    Args:
+        tmp_path: Pytest-provided temporary directory path.
+
+    Returns:
+        None.
+    """
+
+    db_path = tmp_path / "test.db"
+
+    mock_record = MagicMock()
+    mock_record.FILTER = None  # PASS
+    mock_record.INFO.get.return_value = ["ga4gh:VA.aaa"]
+    mock_record.CHROM = "chr1"
+    mock_record.POS = 100
+    # cyvcf2 genotype layout: [allele1, allele2, phased_bool]
+    mock_record.genotypes = [
+        [0, 1, False],  # S1: 0/1 → HET
+        [1, 1, False],  # S2: 1/1 → HOM_ALT
+    ]
+    mock_record.format.return_value = None  # no GQ/DP
+
+    mock_vcf = MagicMock()
+    mock_vcf.samples = ["S1", "S2"]
+    mock_vcf.__iter__ = MagicMock(return_value=iter([mock_record]))
+
+    with patch("cyvcf2.VCF", return_value=mock_vcf):
+        count = load_samples("fake.vcf.gz", db_path)
+
+    assert count == 2
+    conn = open_db(db_path)
+    assert "ga4gh:VA.aaa" in get_vrs_ids(conn, "S1")
+    assert "ga4gh:VA.aaa" in get_vrs_ids(conn, "S2")
+    conn.close()
+
+
+def test_load_samples_gq_filter(tmp_path):
+    """Verify records below the GQ threshold are excluded.
+
+    Args:
+        tmp_path: Pytest-provided temporary directory path.
+
+    Returns:
+        None.
+    """
+
+    db_path = tmp_path / "test.db"
+
+    mock_record = MagicMock()
+    mock_record.FILTER = None
+    mock_record.INFO.get.return_value = ["ga4gh:VA.aaa"]
+    mock_record.CHROM = "chr1"
+    mock_record.POS = 100
+    mock_record.genotypes = [[0, 1, False]]  # S1: HET
+
+    # GQ array: S1 has GQ=10 (below default threshold of 20)
+    gq_arr = MagicMock()
+    gq_arr.__getitem__ = MagicMock(return_value=[10])
+    mock_record.format.return_value = gq_arr
+
+    mock_vcf = MagicMock()
+    mock_vcf.samples = ["S1"]
+    mock_vcf.__iter__ = MagicMock(return_value=iter([mock_record]))
+
+    with patch("cyvcf2.VCF", return_value=mock_vcf):
+        count = load_samples("fake.vcf.gz", db_path, gq_threshold=20)
+
+    assert count == 0
