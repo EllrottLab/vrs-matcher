@@ -2,6 +2,7 @@ name: CI
 
 on:
   push:
+    # run on pushes to main and development branches
     branches: [main, development]
   pull_request:
 
