@@ -250,14 +250,19 @@ def test_load_samples_include_no_call(tmp_path):
         count_excluded = load_samples("fake.vcf.gz", db_path)
     assert count_excluded == 0
 
+    # include_no_call=True: genotype is NO_CALL; no carried alleles to index,
+    # so no rows are emitted even when the flag is set.
     db_path2 = tmp_path / "test2.db"
     mock_vcf.__iter__ = MagicMock(return_value=iter([mock_record]))
     with patch("cyvcf2.VCF", return_value=mock_vcf):
         count_included = load_samples("fake.vcf.gz", db_path2, include_no_call=True)
-    assert count_included == 1
-    conn = open_db(db_path2)
-    assert "ga4gh:VA.aaa" in get_vrs_ids(conn, "S1")
-    conn.close()
+    assert count_included == 0
+
+    # include_no_call=False (default): same result — NO_CALL is excluded.
+    mock_vcf.__iter__ = MagicMock(return_value=iter([mock_record]))
+    with patch("cyvcf2.VCF", return_value=mock_vcf):
+        count_excluded2 = load_samples("fake.vcf.gz", db_path2, include_no_call=False)
+    assert count_excluded2 == 0
 
 
 def test_load_samples_gq_filter(tmp_path):
