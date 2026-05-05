@@ -9,7 +9,7 @@ from pathlib import Path
 
 import cyvcf2
 
-from .db import insert_alleles, open_db
+from .db import insert_alleles, open_db, register_samples
 from .models import Zygosity
 
 DEFAULT_GQ_THRESHOLD: float = 20
@@ -229,6 +229,13 @@ def load_samples(
 
     _BATCH = 10_000
     conn = open_db(db_path)
+
+    # Register every sample in the VCF header so that samples with zero
+    # surviving alleles after filtering are still visible in the index.
+    _vcf_header = cyvcf2.VCF(str(vcf_path))
+    register_samples(conn, _vcf_header.samples)
+    _vcf_header.close()
+
     total = 0
     batch: list[tuple] = []
     try:

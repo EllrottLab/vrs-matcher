@@ -135,3 +135,48 @@ def test_shared_variants_no_overlap(test_db):
     result = CliRunner().invoke(cli, ["shared-variants", "S2", "S3", "--db", test_db])
     assert result.exit_code == 0
     assert result.output.strip() == ""
+
+
+def test_match_samples_unknown_sample_error(test_db):
+    """Verify match-samples exits with an error for an unregistered sample.
+
+    Args:
+        test_db: Path to populated temporary SQLite database.
+
+    Returns:
+        None.
+    """
+
+    result = CliRunner().invoke(cli, ["match-samples", "GHOST", "S2", "--db", test_db])
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower()
+
+
+def test_match_sample_unknown_sample_error(test_db):
+    """Verify match-sample exits with an error for an unregistered sample.
+
+    Args:
+        test_db: Path to populated temporary SQLite database.
+
+    Returns:
+        None.
+    """
+
+    result = CliRunner().invoke(cli, ["match-sample", "GHOST", "--db", test_db])
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower()
+
+
+def test_shared_variants_unknown_sample_error(test_db):
+    """Verify shared-variants exits with an error for an unregistered sample.
+
+    Args:
+        test_db: Path to populated temporary SQLite database.
+
+    Returns:
+        None.
+    """
+
+    result = CliRunner().invoke(cli, ["shared-variants", "GHOST", "S2", "--db", test_db])
+    assert result.exit_code != 0
+    assert "not found" in result.output.lower()

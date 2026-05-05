@@ -7,7 +7,7 @@ set overlap and genotype concordance.
 from dataclasses import dataclass
 from enum import StrEnum
 
-from .db import get_genotype_states, get_vrs_ids, list_samples
+from .db import get_genotype_states, get_vrs_ids, list_samples, sample_exists
 from .models import GenotypeState, Zygosity
 
 
@@ -133,7 +133,14 @@ def match_pair(
 
     Returns:
         A :class:`MatchResult` containing similarity metrics and summary counts.
+
+    Raises:
+        KeyError: If either sample ID is not registered in the index.
     """
+
+    for sid in (sample_a, sample_b):
+        if not sample_exists(conn, sid):
+            raise KeyError(sid)
 
     ids_a = get_vrs_ids(conn, sample_a)
     ids_b = get_vrs_ids(conn, sample_b)
@@ -177,7 +184,13 @@ def match_against_all(
 
     Returns:
         List of match results sorted by descending Jaccard score.
+
+    Raises:
+        KeyError: If ``sample_id`` is not registered in the index.
     """
+
+    if not sample_exists(conn, sample_id):
+        raise KeyError(sample_id)
 
     others = [s for s in list_samples(conn) if s != sample_id]
     results = [

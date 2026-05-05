@@ -11,6 +11,8 @@ from vrs_matcher.db import (
     get_vrs_ids,
     insert_alleles,
     list_samples,
+    register_samples,
+    sample_exists,
 )
 from vrs_matcher.models import Zygosity
 
@@ -137,3 +139,67 @@ def test_null_optional_fields(db_conn):
     states = get_genotype_states(db_conn, "S1")
     assert states["ga4gh:VA.aaa"].gq is None
     assert states["ga4gh:VA.aaa"].depth is None
+
+
+def test_register_samples_and_sample_exists(db_conn):
+    """Verify registered samples are discoverable even with zero allele rows.
+
+    Args:
+        db_conn: Open temporary SQLite connection fixture.
+
+    Returns:
+        None.
+    """
+
+    register_samples(db_conn, ["ZERO", "ALSO_ZERO"])
+    assert sample_exists(db_conn, "ZERO") is True
+    assert sample_exists(db_conn, "ALSO_ZERO") is True
+    assert sample_exists(db_conn, "UNKNOWN") is False
+    # Both appear in list_samples despite having no allele rows.
+    assert "ZERO" in list_samples(db_conn)
+    assert "ALSO_ZERO" in list_samples(db_conn)
+
+
+def test_register_samples_idempotent(db_conn):
+    """Verify calling register_samples twice does not raise or duplicate.
+
+    Args:
+        db_conn: Open temporary SQLite connection fixture.
+
+    Returns:
+        None.
+    """
+
+    register_samples(db_conn, ["S1"])
+    register_samples(db_conn, ["S1"])
+    assert list_samples(db_conn).count("S1") == 1
+
+
+def test_insert_alleles_auto_registers_samples(db_conn):
+    """Verify insert_alleles registers the sample IDs it inserts.
+
+    Args:
+        db_conn: Open temporary SQLite connection fixture.
+
+    Returns:
+        None.
+    """
+
+    insert_alleles(db_conn, [("AUTO", "ga4gh:VA.aaa", "0/1", "HET", "chr1", 1, None, None, None)])
+    assert sample_exists(db_conn, "AUTO") is True
+    assert "AUTO" in list_samples(db_conn)
+
+
+def test_list_samples_includes_zero_allele_samples(db_conn):
+    """Verify list_samples returns registered samples with no allele rows.
+
+    Args:
+        db_conn: Open temporary SQLite connection fixture.
+
+    Returns:
+        None.
+    """
+
+    register_samples(db_conn, ["EMPTY_SAMPLE"])
+    assert "EMPTY_SAMPLE" in list_samples(db_conn)
+    assert get_vrs_ids(db_conn, "EMPTY_SAMPLE") == frozenset()

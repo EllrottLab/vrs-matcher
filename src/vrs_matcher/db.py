@@ -11,6 +11,9 @@ from pathlib import Path
 from .models import GenotypeState, Zygosity
 
 _SCHEMA = """
+CREATE TABLE IF NOT EXISTS samples (
+    sample_id TEXT PRIMARY KEY
+);
 CREATE TABLE IF NOT EXISTS sample_allele (
     sample_id      TEXT,
     vrs_id         TEXT,
@@ -46,8 +49,52 @@ def open_db(path: str | Path) -> sqlite3.Connection:
     return conn
 
 
+def register_samples(conn: sqlite3.Connection, sample_ids: Iterable[str]) -> None:
+    """Register sample IDs in the samples table.
+
+    Idempotent: already-present IDs are silently ignored.  Call this with the
+    full VCF-header sample list during ingestion so that samples with zero
+    surviving alleles are still discoverable.
+
+    Args:
+        conn: Open SQLite connection.
+        sample_ids: Iterable of sample identifiers to register.
+
+    Returns:
+        None.
+    """
+
+    conn.executemany(
+        "INSERT OR IGNORE INTO samples (sample_id) VALUES (?)",
+        ((sid,) for sid in sample_ids),
+    )
+    conn.commit()
+
+
+def sample_exists(conn: sqlite3.Connection, sample_id: str) -> bool:
+    """Return whether a sample ID is present in the index.
+
+    A sample is considered present if it was registered during ingestion, even
+    if it has zero surviving allele rows after filtering.
+
+    Args:
+        conn: Open SQLite connection.
+        sample_id: Sample identifier to look up.
+
+    Returns:
+        ``True`` if the sample is registered, ``False`` otherwise.
+    """
+
+    cur = conn.execute("SELECT 1 FROM samples WHERE sample_id = ?", (sample_id,))
+    return cur.fetchone() is not None
+
+
 def insert_alleles(conn: sqlite3.Connection, rows: Iterable[tuple]) -> None:
     """Insert or replace allele rows into the index.
+
+    Also registers the sample IDs found in ``rows`` so that callers which
+    bypass the VCF loader (e.g. tests) are still reflected in
+    :func:`list_samples` and :func:`sample_exists`.
 
     Args:
         conn: Open SQLite connection.
@@ -59,13 +106,15 @@ def insert_alleles(conn: sqlite3.Connection, rows: Iterable[tuple]) -> None:
         None.
     """
 
+    rows_list = list(rows)
+    register_samples(conn, dict.fromkeys(row[0] for row in rows_list))
     conn.executemany(
         """
         INSERT OR REPLACE INTO sample_allele
             (sample_id, vrs_id, gt, zygosity, chrom, pos, gq, dp, source_dataset)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        rows,
+        rows_list,
     )
     conn.commit()
 
@@ -113,7 +162,10 @@ def get_genotype_states(conn: sqlite3.Connection, sample_id: str) -> dict[str, G
 
 
 def list_samples(conn: sqlite3.Connection) -> list[str]:
-    """Return all sample IDs present in the index.
+    """Return all sample IDs registered in the index.
+
+    Includes samples that were processed during ingestion but had zero
+    surviving allele rows after filtering.
 
     Args:
         conn: Open SQLite connection.
@@ -122,5 +174,5 @@ def list_samples(conn: sqlite3.Connection) -> list[str]:
         Sorted list of unique sample identifiers.
     """
 
-    cur = conn.execute("SELECT DISTINCT sample_id FROM sample_allele ORDER BY sample_id")
+    cur = conn.execute("SELECT sample_id FROM samples ORDER BY sample_id")
     return [row["sample_id"] for row in cur]

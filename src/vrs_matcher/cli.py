@@ -73,6 +73,8 @@ def match_samples_cmd(sample_a: str, sample_b: str, db: str) -> None:
     conn = open_db(db)
     try:
         result = match_pair(conn, sample_a, sample_b)
+    except KeyError as exc:
+        raise click.ClickException(f"Sample not found in index: {exc.args[0]}") from exc
     finally:
         conn.close()
 
@@ -115,6 +117,8 @@ def match_sample_cmd(sample_id: str, against: str, top: int, db: str) -> None:
     conn = open_db(db)
     try:
         results = match_against_all(conn, sample_id, top_n=top)
+    except KeyError as exc:
+        raise click.ClickException(f"Sample not found in index: {exc.args[0]}") from exc
     finally:
         conn.close()
 
@@ -151,6 +155,8 @@ def shared_variants_cmd(sample_a: str, sample_b: str, db: str) -> None:
     conn = open_db(db)
     try:
         result = match_pair(conn, sample_a, sample_b)
+    except KeyError as exc:
+        raise click.ClickException(f"Sample not found in index: {exc.args[0]}") from exc
     finally:
         conn.close()
 

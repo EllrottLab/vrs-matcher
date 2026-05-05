@@ -290,3 +290,52 @@ class TestMatchAgainstAll:
         row = ("LONE", "ga4gh:VA.aaa", "0/1", "HET", "chr1", 1, None, None, None)
         insert_alleles(db_conn, [row])
         assert match_against_all(db_conn, "LONE") == []
+
+    def test_unknown_sample_raises_key_error(self, db_conn):
+        """Verify match_against_all raises KeyError for an unregistered sample.
+
+        Args:
+            db_conn: Open temporary SQLite connection fixture.
+
+        Returns:
+            None.
+        """
+
+        import pytest
+
+        with pytest.raises(KeyError, match="GHOST"):
+            match_against_all(db_conn, "GHOST")
+
+
+class TestMatchPairKeyError:
+    """Tests that match_pair raises on unknown sample IDs."""
+
+    def test_unknown_sample_a_raises(self, populated_db):
+        """Verify KeyError is raised when sample_a is not in the index.
+
+        Args:
+            populated_db: Populated temporary SQLite connection.
+
+        Returns:
+            None.
+        """
+
+        import pytest
+
+        with pytest.raises(KeyError, match="GHOST"):
+            match_pair(populated_db, "GHOST", "S1")
+
+    def test_unknown_sample_b_raises(self, populated_db):
+        """Verify KeyError is raised when sample_b is not in the index.
+
+        Args:
+            populated_db: Populated temporary SQLite connection.
+
+        Returns:
+            None.
+        """
+
+        import pytest
+
+        with pytest.raises(KeyError, match="GHOST"):
+            match_pair(populated_db, "S1", "GHOST")
