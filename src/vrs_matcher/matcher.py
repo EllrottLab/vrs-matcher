@@ -76,8 +76,8 @@ def _concordance(gt_a: GenotypeState, gt_b: GenotypeState) -> float:
 
     Scoring rules:
 
-    1. Same genotype string -> ``1.0``.
-    2. Different genotype string -> ``0.5``.
+    1. Same zygosity -> ``1.0``.
+    2. Different zygosity -> ``0.5``.
     3. Either side is ``NO_CALL`` -> ``0.0``.
 
     Args:
@@ -89,7 +89,7 @@ def _concordance(gt_a: GenotypeState, gt_b: GenotypeState) -> float:
     """
     if gt_a.zygosity == Zygosity.NO_CALL or gt_b.zygosity == Zygosity.NO_CALL:
         return 0.0
-    if gt_a.gt == gt_b.gt:
+    if gt_a.zygosity == gt_b.zygosity:
         return 1.0
     return 0.5
 

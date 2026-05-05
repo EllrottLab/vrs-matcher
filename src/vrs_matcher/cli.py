@@ -88,6 +88,7 @@ def match_samples_cmd(sample_a: str, sample_b: str, db: str) -> None:
     "--against",
     default="all",
     show_default=True,
+    type=click.Choice(["all"]),
     help="Comparison target (currently only 'all' is supported).",
 )
 @click.option("--top", default=20, show_default=True, help="Number of top matches to return.")

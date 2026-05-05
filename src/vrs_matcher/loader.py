@@ -162,7 +162,7 @@ def _iter_rows(
                 zyg = _zygosity(alleles)
                 if zyg == Zygosity.NO_CALL and not include_no_call:
                     continue
-                if zyg in (Zygosity.REF, Zygosity.NO_CALL):
+                if zyg == Zygosity.REF:
                     continue
 
                 sample_gq = _format_scalar(gq_arr, sample_idx)
@@ -174,7 +174,12 @@ def _iter_rows(
                     continue
 
                 gt_str = _gt_string(alleles, phased)
-                carried = genotype_to_vrs_ids(vrs_ids, alleles)
+                # For NO_CALL genotypes the allele indexes are unknown; emit a
+                # row for every VRS ID at the locus to record the missing call.
+                if zyg == Zygosity.NO_CALL:
+                    carried = list(vrs_ids)
+                else:
+                    carried = genotype_to_vrs_ids(vrs_ids, alleles)
 
                 for vrs_id in dict.fromkeys(carried):  # one row per (sample_id, vrs_id)
                     if candidate_vrs_ids is not None and vrs_id not in candidate_vrs_ids:
@@ -219,19 +224,27 @@ def load_samples(
         Number of allele rows inserted.
     """
 
-    rows = list(
-        _iter_rows(
+    _BATCH = 10_000
+    conn = open_db(db_path)
+    total = 0
+    batch: list[tuple] = []
+    try:
+        for row in _iter_rows(
             vcf_path,
             source_dataset=source_dataset,
             gq_threshold=gq_threshold,
             dp_threshold=dp_threshold,
             include_no_call=include_no_call,
             candidate_vrs_ids=candidate_vrs_ids,
-        )
-    )
-    conn = open_db(db_path)
-    try:
-        insert_alleles(conn, rows)
+        ):
+            batch.append(row)
+            if len(batch) >= _BATCH:
+                insert_alleles(conn, batch)
+                total += len(batch)
+                batch = []
+        if batch:
+            insert_alleles(conn, batch)
+            total += len(batch)
     finally:
         conn.close()
-    return len(rows)
+    return total

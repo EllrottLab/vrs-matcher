@@ -216,6 +216,50 @@ def test_load_samples_stores_rows(tmp_path):
     conn.close()
 
 
+def test_load_samples_include_no_call(tmp_path):
+    """Verify include_no_call=True writes rows for NO_CALL genotypes.
+
+    When ``include_no_call=False`` (default) a NO_CALL genotype produces no
+    rows. When ``include_no_call=True`` the VRS IDs at the locus are written
+    with NO_CALL zygosity, and the returned count reflects those rows.
+
+    Args:
+        tmp_path: Pytest-provided temporary directory path.
+
+    Returns:
+        None.
+    """
+
+    db_path = tmp_path / "test.db"
+
+    mock_record = MagicMock()
+    mock_record.FILTER = None
+    mock_record.INFO.get.return_value = ["ga4gh:VA.aaa"]
+    mock_record.CHROM = "chr1"
+    mock_record.POS = 100
+    # S1: ./. → NO_CALL
+    mock_record.genotypes = [[-1, -1, False]]
+    mock_record.format.return_value = None
+
+    mock_vcf = MagicMock()
+    mock_vcf.samples = ["S1"]
+    mock_vcf.__iter__ = MagicMock(return_value=iter([mock_record]))
+
+    # Default: NO_CALL excluded
+    with patch("cyvcf2.VCF", return_value=mock_vcf):
+        count_excluded = load_samples("fake.vcf.gz", db_path)
+    assert count_excluded == 0
+
+    db_path2 = tmp_path / "test2.db"
+    mock_vcf.__iter__ = MagicMock(return_value=iter([mock_record]))
+    with patch("cyvcf2.VCF", return_value=mock_vcf):
+        count_included = load_samples("fake.vcf.gz", db_path2, include_no_call=True)
+    assert count_included == 1
+    conn = open_db(db_path2)
+    assert "ga4gh:VA.aaa" in get_vrs_ids(conn, "S1")
+    conn.close()
+
+
 def test_load_samples_gq_filter(tmp_path):
     """Verify records below the GQ threshold are excluded.
 
