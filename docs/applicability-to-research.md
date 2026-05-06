@@ -101,6 +101,27 @@ overlap and genotype concordance, it provides a practical foundation for sample
 identity QC, cohort harmonization, candidate-driven retrieval, and cross-study
 comparison in contemporary genomics research.
 
+## Conceptual Figure
+
+```mermaid
+flowchart TD
+    A[VCF callsets from genomes, exomes, or cohort releases] --> B[VRS annotation<br/>normalize alleles to GA4GH VRS IDs]
+    B --> C[SQLite sample-allele index<br/>sample_id, vrs_id, genotype state, locus metadata]
+    C --> D[Similarity scoring<br/>Jaccard overlap + weighted concordance]
+
+    D --> E1[Sample identity QC<br/>duplicate detection, swap detection, resequencing checks]
+    D --> E2[Cross-cohort harmonization<br/>overlap detection across pipelines or institutions]
+    D --> E3[Population-genomic benchmarking<br/>test recovery of known population structure]
+    D --> E4[Candidate-focused retrieval<br/>match samples sharing prioritized alleles]
+```
+
+**Figure 1. Conceptual overview of `vrs-matcher` in genomics research.**
+VCF-derived alleles are normalized to GA4GH VRS identifiers, loaded into a
+portable SQLite index, and compared with set-overlap and genotype-concordance
+metrics. The resulting similarity profiles can support sample identity quality
+control, cohort harmonization, population-structure benchmarking, and
+candidate-variant matching.
+
 ## Research Use Cases
 
 ### 1. Sample identity confirmation
@@ -168,6 +189,25 @@ Typical scenarios include:
 - retrieving samples that share a prioritized variant panel;
 - comparing rare disease cases over a candidate gene or variant list;
 - building focused cohorts around pathogenic or likely pathogenic alleles.
+
+```mermaid
+flowchart LR
+    A[Undiagnosed rare disease cases<br/>clinical genomes, exomes, or reanalysis VCFs] --> B[Variant prioritization<br/>candidate genes, pathogenic alleles, phenotype-driven review]
+    B --> C[Convert prioritized alleles to candidate VRS IDs]
+    C --> D[Load VRS-annotated samples into SQLite index<br/>using load_samples]
+    D --> E[Targeted matching against indexed samples<br/>using candidate_vrs_ids]
+
+    E --> F1[Case retrieval<br/>find individuals sharing prioritized alleles]
+    E --> F2[Translational cohort building<br/>group samples for downstream review]
+    E --> F3[Reanalysis support<br/>compare newly prioritized cases to historical cohorts]
+    E --> F4[Manual interpretation follow-up<br/>review phenotype, zygosity, and overlap context]
+```
+
+**Figure 2. Rare disease and translational genomics workflow enabled by `vrs-matcher`.**
+Prioritized alleles from undiagnosed cases can be normalized to VRS IDs and
+used for targeted matching against an indexed cohort. This supports retrieval of
+partially overlapping cases, construction of translational review cohorts, and
+systematic reanalysis when candidate variants are revisited over time.
 
 ### 6. Longitudinal and reanalysis consistency checking
 
