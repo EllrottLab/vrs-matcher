@@ -42,4 +42,3 @@ def test_intra_population_jaccard_exceeds_inter_population(
         assert mean(intra_scores) > mean(inter_scores)
     finally:
         conn.close()
-

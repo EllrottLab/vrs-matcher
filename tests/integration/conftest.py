@@ -105,4 +105,3 @@ def annotated_vcf(tmp_path_factory: pytest.TempPathFactory) -> Path:
     annotator.annotate(subset_vcf, annotated)
 
     return annotated
-

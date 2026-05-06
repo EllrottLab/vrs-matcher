@@ -362,5 +362,3 @@ def test_load_samples_parses_string_vrs_info(tmp_path):
         assert get_vrs_ids(conn, "S1") == frozenset({"ga4gh:VA.aaa", "ga4gh:VA.bbb"})
     finally:
         conn.close()
-
-
