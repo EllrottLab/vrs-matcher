@@ -147,7 +147,7 @@ def _iter_rows(
             vrs_ids_raw = record.INFO.get("VRS_Allele_IDs")
             if not vrs_ids_raw:
                 continue
-            vrs_ids = list(vrs_ids_raw)
+            vrs_ids = [vrs_ids_raw] if isinstance(vrs_ids_raw, str) else list(vrs_ids_raw)
 
             chrom = record.CHROM
             pos = record.POS
