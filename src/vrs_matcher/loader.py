@@ -147,12 +147,26 @@ def _iter_rows(
             vrs_ids_raw = record.INFO.get("VRS_Allele_IDs")
             if not vrs_ids_raw:
                 continue
-            vrs_ids = list(vrs_ids_raw)
+            if isinstance(vrs_ids_raw, str):
+                # cyvcf2 returns INFO string values as comma-delimited text.
+                vrs_ids = [v for v in vrs_ids_raw.split(",") if v]
+            else:
+                vrs_ids = [str(v) for v in vrs_ids_raw if v]
+            if not vrs_ids:
+                continue
 
             chrom = record.CHROM
             pos = record.POS
-            gq_arr = record.format("GQ")
-            dp_arr = record.format("DP")
+            # cyvcf2 raises KeyError when a FORMAT field is absent from a record
+            # (e.g. population-panel VCFs that carry no GQ/DP columns).
+            try:
+                gq_arr = record.format("GQ")
+            except KeyError:
+                gq_arr = None
+            try:
+                dp_arr = record.format("DP")
+            except KeyError:
+                dp_arr = None
 
             for sample_idx, sample_id in enumerate(sample_names):
                 raw_gt = record.genotypes[sample_idx]  # [a1, a2, ..., phased_bool]
