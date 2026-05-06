@@ -48,7 +48,7 @@ uv sync --group dev --group integration
 scripts/setup_integration_data.sh
 
 # run just integration tests
-export GA4GH_VRS_DATAPROXY_URI=seqrepo+file:///usr/local/share/seqrepo/2024-12-20
+export GA4GH_VRS_DATAPROXY_URI=seqrepo+file://$HOME/.local/share/seqrepo/2024-12-20
 RUN_INTEGRATION_TESTS=1 uv run pytest -m integration --run-integration
 ```
 

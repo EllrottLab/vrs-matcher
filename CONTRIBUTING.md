@@ -23,7 +23,7 @@ uv sync --group dev --group integration
 scripts/setup_integration_data.sh
 
 # required by tests/integration/conftest.py
-export GA4GH_VRS_DATAPROXY_URI=seqrepo+file:///usr/local/share/seqrepo/2024-12-20
+export GA4GH_VRS_DATAPROXY_URI=seqrepo+file://$HOME/.local/share/seqrepo/2024-12-20
 ```
 
 To use a different snapshot or root directory, set `SEQREPO_INSTANCE` and/or
@@ -47,7 +47,7 @@ uv run ruff format .
 uv run pytest
 
 # Optional integration test (network + local seqrepo required)
-GA4GH_VRS_DATAPROXY_URI=seqrepo+file:///usr/local/share/seqrepo/2024-12-20 \
+GA4GH_VRS_DATAPROXY_URI=seqrepo+file://$HOME/.local/share/seqrepo/2024-12-20 \
   RUN_INTEGRATION_TESTS=1 uv run pytest -m integration --run-integration
 ```
 

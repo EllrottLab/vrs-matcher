@@ -55,7 +55,7 @@ def annotated_vcf(tmp_path_factory: pytest.TempPathFactory) -> Path:
     a reachable SeqRepo data source, for example::
 
         # local seqrepo install (recommended for CI)
-        GA4GH_VRS_DATAPROXY_URI=seqrepo+file:///usr/local/share/seqrepo/2024-12-20
+        GA4GH_VRS_DATAPROXY_URI=seqrepo+file://$HOME/.local/share/seqrepo/2024-12-20
 
         # local seqrepo REST server
         GA4GH_VRS_DATAPROXY_URI=seqrepo+http://localhost:5000/seqrepo
@@ -71,7 +71,7 @@ def annotated_vcf(tmp_path_factory: pytest.TempPathFactory) -> Path:
     if not dataproxy_uri:
         pytest.skip(
             "Set GA4GH_VRS_DATAPROXY_URI to run integration tests, e.g. "
-            "GA4GH_VRS_DATAPROXY_URI=seqrepo+file:///usr/local/share/seqrepo/2024-12-20"
+            "GA4GH_VRS_DATAPROXY_URI=seqrepo+file://$HOME/.local/share/seqrepo/2024-12-20"
         )
 
     from ga4gh.vrs.dataproxy import create_dataproxy
