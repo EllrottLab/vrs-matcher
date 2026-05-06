@@ -7,7 +7,7 @@ on:
 
 env:
   SEQREPO_INSTANCE: "2024-12-20"
-  SEQREPO_ROOT: /usr/local/share/seqrepo
+  SEQREPO_ROOT: ${{ runner.temp }}/seqrepo
 
 jobs:
   integration:
