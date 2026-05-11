@@ -242,4 +242,3 @@ def test_match_sample_identity_confirmation_top_hit(tmp_path):
     data_lines = [line for line in result.output.splitlines() if line and not line.startswith("-")]
     assert len(data_lines) >= 2
     assert data_lines[1].startswith("RESEQ")
-

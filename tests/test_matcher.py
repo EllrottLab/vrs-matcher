@@ -381,4 +381,3 @@ class TestSampleIdentityConfirmationUseCase:
         results = match_against_all(identity_db, "BASELINE")
         assert results[0].sample_b == "RESEQ"
         assert results[0].jaccard > results[1].jaccard
-
