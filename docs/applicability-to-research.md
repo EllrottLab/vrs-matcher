@@ -163,9 +163,9 @@ Typical scenarios include:
 
 When cohorts are merged across sequencing centers or analysis pipelines, raw VCF
 comparison is often confounded by representation differences. `vrs-matcher`
-offers a harmonized matching layer based on normalized allele identity. The 
-current implementation supports loading a VRS-annotated VCF into SQLite and 
-comparing a query sample against all indexed samples, making it suitable for 
+offers a harmonized matching layer based on normalized allele identity. The
+current implementation supports loading a VRS-annotated VCF into SQLite and
+comparing a query sample against all indexed samples, making it suitable for
 exploratory matching at cohort scale.
 
 Typical scenarios include:
