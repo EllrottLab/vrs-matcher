@@ -511,10 +511,10 @@ def test_match_sample_release_qc_top_hit(tmp_path):
     conn.close()
 
     result = CliRunner().invoke(
-        cli, ["match-sample", "REFERENCE_RELEASE_SAMPLE", "--db", db, "--top", "1"]
+        cli, ["match-sample", "INCOMING_RELEASE_DUP", "--db", db, "--top", "1"]
     )
     assert result.exit_code == 0
 
     data_lines = [line for line in result.output.splitlines() if line and not line.startswith("-")]
     assert len(data_lines) >= 2
-    assert data_lines[1].startswith("INCOMING_RELEASE_DUP")
+    assert data_lines[1].startswith("REFERENCE_RELEASE_SAMPLE")

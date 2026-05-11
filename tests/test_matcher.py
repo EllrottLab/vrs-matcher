@@ -540,6 +540,6 @@ class TestCohortDeduplicationQualityControlUseCase:
     def test_incoming_release_sample_ranks_duplicate_first(self, dedup_db):
         """The duplicate candidate should be the top-ranked cohort match."""
 
-        results = match_against_all(dedup_db, "REFERENCE_RELEASE_SAMPLE")
-        assert results[0].sample_b == "INCOMING_RELEASE_DUP"
+        results = match_against_all(dedup_db, "INCOMING_RELEASE_DUP")
+        assert results[0].sample_b == "REFERENCE_RELEASE_SAMPLE"
         assert results[0].jaccard > results[1].jaccard
