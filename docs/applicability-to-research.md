@@ -39,9 +39,7 @@ practical implementation of this concept by ingesting VRS-annotated VCF data
 into a portable database and exposing one-vs-one and one-vs-all sample matching
 operations.
 
-**`vrs-matcher` answers recurring sample-level questions in multi-pipeline genomics over time: 
-identity, cohort overlap, candidate-allele retrieval, and longitudinal consistency, 
-on a normalized VRS allele substrate.**
+**`vrs-matcher` answers recurring sample-level questions in multi-pipeline genomics over time: identity, cohort overlap, candidate-allele retrieval, and longitudinal consistency, on a normalized VRS allele substrate.**
 
 ## VRS as the Matching Substrate
 
