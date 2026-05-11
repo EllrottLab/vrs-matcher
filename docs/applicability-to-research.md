@@ -4,7 +4,8 @@
 
 Large-scale human genomics studies increasingly require the comparison of
 variant data across sequencing assays, bioinformatics pipelines, institutions,
-and time points. In practice, however, direct comparison of Variant Call Format
+and time points, including in multi-center and longitudinal genomics
+workflows. In practice, however, direct comparison of Variant Call Format
 (VCF) files is hindered by representational heterogeneity: the same biological
 allele may be encoded differently because of left alignment, trimming,
 multiallelic decomposition, normalization choices, reference-context
@@ -24,7 +25,7 @@ fields. Similarity between samples is then quantified using two complementary
 metrics: **Jaccard similarity**, which measures overlap in carried allele sets,
 and **weighted concordance**, which measures agreement in genotype state for
 shared alleles. By operating on normalized VRS identifiers instead of raw VCF
-allele strings, `vrs-matcher` is intended to support more reproducible matching
+allele strings, `vrs-matcher` supports more reproducible matching
 across datasets that differ in upstream processing but encode the same
 underlying biological variation.
 
@@ -38,68 +39,43 @@ practical implementation of this concept by ingesting VRS-annotated VCF data
 into a portable database and exposing one-vs-one and one-vs-all sample matching
 operations.
 
-A major use case is **sample identity quality control**. Large sequencing
-programs frequently need to determine whether two files correspond to the same
-individual, a resequenced specimen, an accidental duplicate, or a potential
-sample swap. Because `vrs-matcher` compares normalized allele identities rather
-than raw variant strings, it can be used after VRS annotation to identify
-unexpectedly similar or dissimilar samples across reprocessing runs, partner
-submissions, or merged releases. The addition of weighted genotype concordance
-provides a useful second dimension beyond simple allele overlap, allowing users
-to distinguish samples that share many alleles but differ materially in
-zygosity.
+**`vrs-matcher` answers recurring sample-level questions in multi-pipeline genomics over time: 
+identity, cohort overlap, candidate-allele retrieval, and longitudinal consistency, 
+on a normalized VRS allele substrate.**
 
-A second use case is **cross-cohort and cross-pipeline harmonization**. Human
-genomics studies often combine genomes or exomes produced at different centers,
-with different callers, or under different normalization conventions. VRS-based
-allele identities provide a common comparison layer across these disparate
-inputs. In this setting, `vrs-matcher` can support detection of overlapping
-individuals across cohorts, reconciliation of legacy callsets with newly
-processed data, or consistency checks between local datasets and public
-resources. The current implementation supports loading a VRS-annotated VCF into
-SQLite and comparing a query sample against all indexed samples, making it
-suitable for exploratory matching at cohort scale.
+## VRS as the Matching Substrate
 
-A third use case is **candidate-focused genotype matching** in rare disease and
-translational genomics. Although the dominant mode is genome-wide identity or
-similarity assessment, the underlying matching API supports restriction to a
-specific set of VRS identifiers. This creates a path for comparisons over
-curated candidate variants, pathogenic alleles, or project-specific variant
-panels. In practice, this could be applied to retrieve samples sharing a set of
-prioritized alleles, identify partially overlapping cases in rare disease
-reanalysis, or construct focused cohorts centered on variants of clinical or
-biological interest.
+The choice of GA4GH VRS as the identifier layer carries several properties that
+shape how `vrs-matcher` behaves in practice:
 
-The applicability of `vrs-matcher` extends across several domains of genomics
-research. In **population genomics**, it can be used to test whether
-allele-level similarity recapitulates known structure among super-populations,
-as demonstrated by the integration test that uses a chromosome 22 slice from the
-1000 Genomes Project. In **clinical genomics** and laboratory quality
-management, it can support specimen tracking, identity confirmation, and sample
-reconciliation across repeat sequencing or pipeline updates. In **federated or
-multi-center genomics infrastructures**, it offers a compact and queryable layer
-for sample comparison based on normalized variation. In **informatics method
-development**, it provides a reproducible framework for evaluating how
-representation-stable allele identifiers affect sample matching relative to
-record-level VCF comparison.
+- **Canonical, sequence-based allele identity.** The same allele,
+  represented against the same reference, resolves to the same identifier
+  regardless of which party performs the annotation, and without prior
+  coordination between parties.
+- **Reference identity by sequence digest.** VRS locations are anchored to
+  refget-backed sequence identifiers rather than to assembly labels such as
+  "GRCh38". Once alleles have been placed against equivalent reference
+  sequences, their VRS identifiers are comparable in a way that
+  assembly-anchored VCF coordinates are not.
+- **Normalization consistency across ambiguous regions.** In repeats and other
+  regions where the same biological variant may have multiple equivalent
+  representations, VRS normalization reduces sensitivity to
+  upstream choices such as left-alignment, trimming, or alternative allele
+  representations that may otherwise produce different representations of the
+  same biological variant.
+- **Substrate that extends beyond SNVs and small indels.** The VRS
+  specification covers Alleles, Haplotypes, Copy Number, and Genotypes within a
+  single identifier scheme. `vrs-matcher` currently indexes Alleles, but the
+  underlying representation supports richer variation classes without changes
+  to the indexing model.
 
-The current implementation is intentionally focused. `vrs-matcher` compares
-samples on the basis of **observed allele identity** and **genotype-state
-agreement**; it is not a haplotype-aware phasing tool, an ancestry-inference
-method, or a replacement for identity-by-descent and kinship estimators. Its
-outputs should therefore be interpreted as normalized similarity measures over
-observed variation, rather than as full models of relatedness or population
-history. This distinction is important, but it also defines the tool's value:
-`vrs-matcher` fills a practical gap between raw VCF comparison and more complex
-population-genetic inference by providing a standardized, queryable, and
-biologically grounded representation of sample variation.
-
-In summary, `vrs-matcher` is a genomics infrastructure tool for **matching
-samples on normalized allele identities**. By combining VRS-based variation
-representation, SQLite-backed indexing, and similarity metrics based on allele
-overlap and genotype concordance, it provides a practical foundation for sample
-identity QC, cohort harmonization, candidate-driven retrieval, and cross-study
-comparison in contemporary genomics research.
+Together, these properties motivate the use of VRS identifiers as the
+comparison layer for cross-pipeline and cross-institution matching. VRS does
+not replace upstream alignment steps such as liftover when source data are
+aligned to different assemblies. After alleles are placed against equivalent
+reference sequences, identity comparison can operate on a normalized,
+content-derived representation that is robust to many of the differences
+introduced by upstream processing.
 
 ## Conceptual Figure
 
@@ -124,61 +100,7 @@ candidate-variant matching.
 
 ## Research Use Cases
 
-### 1. Sample identity confirmation
-
-`vrs-matcher` can be used to determine whether two VCFs correspond to the same
-biological sample after variant representation has been normalized through VRS.
-This is useful for confirming sample identity across pipeline reprocessing,
-resequencing, or data exchange between collaborating groups.
-
-Typical scenarios include:
-
-- confirming that a resequenced genome matches an earlier release;
-- identifying potential sample swaps in multi-sample processing batches;
-- checking concordance between research and clinical callsets derived from the
-  same specimen.
-
-### 2. Cohort deduplication and data release quality control
-
-Large data commons and institutional repositories often accumulate overlapping
-samples across releases, consent groups, or partner contributions. A
-VRS-based sample index can be used to detect candidate duplicate genomes or
-exomes prior to downstream analysis.
-
-Typical scenarios include:
-
-- screening a cohort for repeated submissions of the same individual;
-- checking whether incoming partner data overlap with an existing repository;
-- validating the uniqueness of samples included in a public release.
-
-### 3. Cross-study harmonization
-
-When cohorts are merged across sequencing centers or analysis pipelines, raw VCF
-comparison is often confounded by representation differences. `vrs-matcher`
-offers a harmonized matching layer based on normalized allele identity.
-
-Typical scenarios include:
-
-- reconciling legacy callsets with newly reprocessed data;
-- identifying overlap between internal cohorts and public reference datasets;
-- validating sample continuity in multi-center meta-analysis pipelines.
-
-### 4. Population-genomic benchmarking
-
-Because matching is based on carried allele overlap, `vrs-matcher` can be used
-to assess whether biologically meaningful structure is recoverable from indexed
-variation data. The current repository includes an integration test based on a
-1000 Genomes Project chromosome 22 slice that evaluates whether mean
-intra-super-population similarity exceeds mean inter-super-population
-similarity.
-
-Typical scenarios include:
-
-- validating ingestion and matching behavior on real human population data;
-- benchmarking representation-normalized similarity against known cohort labels;
-- testing whether methodological changes preserve expected population signal.
-
-### 5. Candidate-variant or panel-restricted matching
+### 1. Candidate-variant or panel-restricted matching
 
 The underlying matching functions support restriction to a selected set of VRS
 identifiers, enabling targeted comparison over project-defined candidate
@@ -208,6 +130,66 @@ Prioritized alleles from undiagnosed cases can be normalized to VRS IDs and
 used for targeted matching against an indexed cohort. This supports retrieval of
 partially overlapping cases, construction of translational review cohorts, and
 systematic reanalysis when candidate variants are revisited over time.
+
+### 2. Sample identity confirmation
+
+`vrs-matcher` can be used to determine whether two VCFs correspond to the same
+biological sample after variant representation has been normalized through VRS.
+This is useful for confirming sample identity across pipeline reprocessing,
+resequencing, or data exchange between collaborating groups. The addition of 
+weighted genotype concordance provides a useful second dimension beyond simple 
+allele overlap, allowing users to distinguish samples that share many alleles but 
+differ materially in zygosity.
+
+Typical scenarios include:
+
+- confirming that a resequenced genome matches an earlier release;
+- identifying potential sample swaps in multi-sample processing batches;
+- checking concordance between research and clinical callsets derived from the
+  same specimen.
+
+### 3. Cohort deduplication and data release quality control
+
+Large data commons and institutional repositories often accumulate overlapping
+samples across releases, consent groups, or partner contributions. A
+VRS-based sample index can be used to detect candidate duplicate genomes or
+exomes prior to downstream analysis.
+
+Typical scenarios include:
+
+- screening a cohort for repeated submissions of the same individual;
+- checking whether incoming partner data overlap with an existing repository;
+- validating the uniqueness of samples included in a public release.
+
+### 4. Cross-study harmonization
+
+When cohorts are merged across sequencing centers or analysis pipelines, raw VCF
+comparison is often confounded by representation differences. `vrs-matcher`
+offers a harmonized matching layer based on normalized allele identity. The 
+current implementation supports loading a VRS-annotated VCF into SQLite and 
+comparing a query sample against all indexed samples, making it suitable for 
+exploratory matching at cohort scale.
+
+Typical scenarios include:
+
+- reconciling legacy callsets with newly reprocessed data;
+- identifying overlap between internal cohorts and public reference datasets;
+- validating sample continuity in multi-center meta-analysis pipelines.
+
+### 5. Population-genomic benchmarking
+
+Because matching is based on carried allele overlap, `vrs-matcher` can be used
+to assess whether biologically meaningful structure is recoverable from indexed
+variation data. The current repository includes an integration test based on a
+1000 Genomes Project chromosome 22 slice that evaluates whether mean
+intra-super-population similarity exceeds mean inter-super-population
+similarity.
+
+Typical scenarios include:
+
+- validating ingestion and matching behavior on real human population data;
+- benchmarking representation-normalized similarity against known cohort labels;
+- testing whether methodological changes preserve expected population signal.
 
 ### 6. Longitudinal and reanalysis consistency checking
 
@@ -275,15 +257,14 @@ rather than replaces specialized statistical genetics methods.
 In practical genomics research, `vrs-matcher` is best viewed as a tool for
 answering questions such as:
 
+- *Which samples share a targeted set of candidate alleles?*
 - *Is this newly processed sample the same as one already present in the
   cohort?*
 - *Do two VCFs appear to describe the same genome after allele normalization?*
 - *Which indexed samples are most similar to a query sample at the level of
   carried VRS alleles?*
 - *Can known population structure be recovered from a VRS-based sample index?*
-- *Which samples share a targeted set of candidate alleles?*
 
 By centering comparison on GA4GH VRS identifiers, `vrs-matcher` provides a
 specific and practically useful bridge between normalized variant
 representation and sample-level genomics inference.
-
