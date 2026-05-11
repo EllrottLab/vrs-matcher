@@ -17,6 +17,10 @@ uv sync
 uv run vrs-matcher
 ```
 
+## User Guides
+
+- [Sample identity confirmation with your own VCFs](docs/how-to-sample-identity-confirmation.md)
+
 ## Development
 
 ### Requirements

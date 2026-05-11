@@ -138,6 +138,29 @@ Typical scenarios include:
 - checking concordance between research and clinical callsets derived from the
   same specimen.
 
+#### Implementation status in current codebase
+
+The current implementation includes the core features needed to support this use
+case:
+
+- **VCF ingestion with VRS allele IDs** via `load_samples`, which loads carried
+  `VRS_Allele_IDs` values into SQLite.
+- **Pairwise identity scoring** via `match_pair` and CLI command
+  `match-samples`, reporting Jaccard similarity and weighted concordance.
+- **One-vs-all ranking** via `match_against_all` and CLI command `match-sample`,
+  enabling duplicate/swap screening against an indexed cohort.
+- **Shared-allele inspection** via CLI command `shared-variants` for manual QC
+  follow-up.
+
+Operational constraints to account for during identity QC:
+
+- Input VCFs must already be annotated with `VRS_Allele_IDs`.
+- Sample IDs are globally keyed in the index (`samples.sample_id` is unique), so
+  if two files use the same sample name you should rename one before loading if
+  you intend to compare them as separate entries.
+- Matching is allele/zygosity based and is not a replacement for kinship/IBD
+  inference.
+
 ### 2. Cohort deduplication and data release quality control
 
 Large data commons and institutional repositories often accumulate overlapping
