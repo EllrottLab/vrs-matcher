@@ -20,6 +20,7 @@ uv run vrs-matcher
 ## User Guides
 
 - [Sample identity confirmation with your own VCFs](docs/how-to-sample-identity-confirmation.md)
+- [Cohort deduplication and data release QC with your own VCFs](docs/how-to-cohort-dedup-qc.md)
 
 ## Development
 

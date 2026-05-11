@@ -242,3 +242,279 @@ def test_match_sample_identity_confirmation_top_hit(tmp_path):
     data_lines = [line for line in result.output.splitlines() if line and not line.startswith("-")]
     assert len(data_lines) >= 2
     assert data_lines[1].startswith("RESEQ")
+
+
+def test_match_samples_release_qc_scores(tmp_path):
+    """Verify CLI pairwise output for a release-style deduplication pair."""
+
+    db = str(tmp_path / "release-qc.db")
+    conn = open_db(db)
+    insert_alleles(
+        conn,
+        [
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v1",
+                "0/1",
+                "HET",
+                "chr1",
+                101,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v2",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                102,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v3",
+                "0/1",
+                "HET",
+                "chr1",
+                103,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v4",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                104,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v1",
+                "0/1",
+                "HET",
+                "chr1",
+                101,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v2",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                102,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v3",
+                "0/1",
+                "HET",
+                "chr1",
+                103,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v4",
+                "0/1",
+                "HET",
+                "chr1",
+                104,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v5",
+                "0/1",
+                "HET",
+                "chr1",
+                105,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+        ],
+    )
+    conn.close()
+
+    result = CliRunner().invoke(
+        cli, ["match-samples", "REFERENCE_RELEASE_SAMPLE", "INCOMING_RELEASE_DUP", "--db", db]
+    )
+    assert result.exit_code == 0
+    assert "Jaccard:" in result.output
+    assert "0.8000" in result.output
+    assert "Weighted concordance:" in result.output
+    assert "0.8750" in result.output
+    assert "Shared variants:" in result.output
+
+
+def test_match_sample_release_qc_top_hit(tmp_path):
+    """Verify the duplicate release sample ranks first in cohort screening."""
+
+    db = str(tmp_path / "release-qc-ranking.db")
+    conn = open_db(db)
+    insert_alleles(
+        conn,
+        [
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v1",
+                "0/1",
+                "HET",
+                "chr1",
+                101,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v2",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                102,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v3",
+                "0/1",
+                "HET",
+                "chr1",
+                103,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v4",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                104,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v1",
+                "0/1",
+                "HET",
+                "chr1",
+                101,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v2",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                102,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v3",
+                "0/1",
+                "HET",
+                "chr1",
+                103,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v4",
+                "0/1",
+                "HET",
+                "chr1",
+                104,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v5",
+                "0/1",
+                "HET",
+                "chr1",
+                105,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_UNRELATED",
+                "ga4gh:VA.v1",
+                "0/1",
+                "HET",
+                "chr1",
+                101,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_UNRELATED",
+                "ga4gh:VA.v6",
+                "0/1",
+                "HET",
+                "chr1",
+                106,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_UNRELATED",
+                "ga4gh:VA.v7",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                107,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+        ],
+    )
+    conn.close()
+
+    result = CliRunner().invoke(
+        cli, ["match-sample", "REFERENCE_RELEASE_SAMPLE", "--db", db, "--top", "1"]
+    )
+    assert result.exit_code == 0
+
+    data_lines = [line for line in result.output.splitlines() if line and not line.startswith("-")]
+    assert len(data_lines) >= 2
+    assert data_lines[1].startswith("INCOMING_RELEASE_DUP")
