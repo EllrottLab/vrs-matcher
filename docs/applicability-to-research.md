@@ -134,9 +134,9 @@ systematic reanalysis when candidate variants are revisited over time.
 `vrs-matcher` can be used to determine whether two VCFs correspond to the same
 biological sample after variant representation has been normalized through VRS.
 This is useful for confirming sample identity across pipeline reprocessing,
-resequencing, or data exchange between collaborating groups. The addition of 
-weighted genotype concordance provides a useful second dimension beyond simple 
-allele overlap, allowing users to distinguish samples that share many alleles but 
+resequencing, or data exchange between collaborating groups. The addition of
+weighted genotype concordance provides a useful second dimension beyond simple
+allele overlap, allowing users to distinguish samples that share many alleles but
 differ materially in zygosity.
 
 Typical scenarios include:
