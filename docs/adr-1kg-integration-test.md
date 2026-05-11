@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed
+Accepted
 
 ## Use Case
 
@@ -77,7 +77,7 @@ sequenceDiagram
 | Download URL | `https://ftp.1000genomes.ebi.ac.uk/vol1/ftp/data_collections/1000G_2504_high_coverage/working/20220422_3202_phased_SNV_INDEL_SV/1kGP_high_coverage_Illumina.chr22.filtered.SNV_INDEL_SV_phased_panel.vcf.gz` |
 | Tabix index | Same URL + `.tbi` suffix |
 | Sample subset | 10 AFR + 10 EUR samples drawn from the Phase 3 panel (hardcoded list for reproducibility) |
-| Tool to subset and slice | `bcftools view --regions --samples` |
+| Tool to subset and slice | `pysam.VariantFile(...).fetch(...)` with in-memory sample subsetting |
 
 Restricting to 20 samples and 1 Mbp keeps download and annotation time
 manageable in CI while preserving enough variants to observe population signal.
@@ -85,16 +85,18 @@ manageable in CI while preserving enough variants to observe population signal.
 ### VRS Annotation
 
 ```python
-from ga4gh.vrs.extras.vcf_annotation import VCFAnnotator
+from ga4gh.vrs.dataproxy import create_dataproxy
+from ga4gh.vrs.extras.annotator.vcf import VcfAnnotator
 
-annotator = VCFAnnotator(seqrepo_data_proxy=...)
+data_proxy = create_dataproxy("seqrepo+file:///usr/local/share/seqrepo/2024-12-20")
+annotator = VcfAnnotator(data_proxy=data_proxy)
 annotator.annotate(input_vcf, output_vcf)
 ```
 
-`vrs-python` requires a SeqRepo data source.  The fixture will use the
-public REST proxy (`https://services.genomics.ga4gh.org/seqrepo/1/`) via
-`ga4gh.vrs.dataproxy.SeqRepoRESTDataProxy` to avoid requiring a local SeqRepo
-installation in CI.
+`vrs-python` requires a SeqRepo data source. The fixture uses
+`GA4GH_VRS_DATAPROXY_URI` (for example,
+`seqrepo+file:///usr/local/share/seqrepo/2024-12-20`) and initializes the
+proxy with `ga4gh.vrs.dataproxy.create_dataproxy`.
 
 ### Assertion Strategy
 
@@ -131,11 +133,13 @@ markers = [
 ```
 
 A separate GitHub Actions workflow (`ci-integration.yml`) runs on a schedule
-(weekly) and on manual dispatch.  It installs additional dependencies
-(`vrs-python`, `bcftools` via `conda`/`apt`), sets `RUN_INTEGRATION_TESTS=1`,
-and runs only the integration marker:
+(weekly) and on manual dispatch. It installs the integration dependency group,
+downloads/caches a local seqrepo snapshot, sets `RUN_INTEGRATION_TESTS=1` and
+`GA4GH_VRS_DATAPROXY_URI`, then runs only the integration marker:
 
 ```yaml
+- run: uv sync --group dev --group integration
+- run: scripts/setup_integration_data.sh
 - run: uv run pytest -m integration --run-integration
 ```
 
@@ -147,10 +151,10 @@ The standard `ci.yml` workflow is unchanged and never runs integration tests.
 |---|---|---|
 | `ga4gh.vrs[extras]` | `integration` | VCF annotation and SeqRepo proxy |
 | `requests` | `integration` | VCF/index download |
-| `pysam` | `integration` | `bcftools`-compatible subsetting (or shell-out to `bcftools`) |
+| `pysam` | `integration` | Slice/subset VCF records from the remote indexed input |
 
-These go in a new `integration` dependency group in `pyproject.toml` and are
-never installed by `uv sync --all-groups` during normal development.
+These go in a dedicated `integration` dependency group in `pyproject.toml` and
+are only required when running integration tests.
 
 ## Consequences
 
@@ -162,10 +166,12 @@ never installed by `uv sync --all-groups` during normal development.
 
 **Negative / Risks**
 
-- Network dependency: test fails if EBI FTP or the GA4GH SeqRepo REST proxy
-  is unavailable.
-- VRS ID stability: SeqRepo proxy updates could change computed VRS IDs across
-  runs; the directional assertion mitigates but does not eliminate this risk.
+- Network dependency: test fails if EBI FTP is unavailable.
+- SeqRepo dependency: integration runs require a local seqrepo snapshot and
+  sufficient disk space (~10 GB).
+- VRS ID stability: changing seqrepo snapshots can change computed VRS IDs
+  across runs; the directional assertion mitigates but does not eliminate this
+  risk.
 - Runtime: expected wall time 3–8 minutes depending on network speed and
   SeqRepo proxy latency.
 

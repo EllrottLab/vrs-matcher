@@ -17,6 +17,11 @@ dev = [
   "pytest-mock>=3.14.0",
   "ruff>=0.11.0",
 ]
+integration = [
+  "ga4gh.vrs[extras]>=2.0.0",
+  "pysam>=0.23.0",
+  "requests>=2.32.0",
+]
 
 [build-system]
 requires = ["hatchling>=1.25.0"]
@@ -42,6 +47,9 @@ vrs-matcher = "vrs_matcher.cli:cli"
 minversion = "8.0"
 addopts = "-ra --cov=vrs_matcher --cov-report=xml --cov-report=term-missing"
 testpaths = ["tests"]
+markers = [
+  "integration: slow tests requiring network access (deselect with '-m not integration')",
+]
 
 [tool.coverage.run]
 source = ["src"]

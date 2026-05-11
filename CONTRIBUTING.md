@@ -12,6 +12,23 @@ cd vrs-matcher
 uv sync --all-groups
 ```
 
+If you plan to run the real-data integration test, install the integration
+group and a local [seqrepo](https://github.com/biocommons/biocommons.seqrepo)
+data instance:
+
+```bash
+uv sync --group dev --group integration
+
+# one-time seqrepo download (~10 GB, cached across runs)
+scripts/setup_integration_data.sh
+
+# required by tests/integration/conftest.py
+export GA4GH_VRS_DATAPROXY_URI=seqrepo+file://$HOME/.local/share/seqrepo/2024-12-20
+```
+
+To use a different snapshot or root directory, set `SEQREPO_INSTANCE` and/or
+`SEQREPO_ROOT` before running `scripts/setup_integration_data.sh`.
+
 ## Making changes
 
 1. Create a branch: `git checkout -b your-feature`
@@ -28,6 +45,10 @@ uv run ruff format .
 
 # Tests
 uv run pytest
+
+# Optional integration test (network + local seqrepo required)
+GA4GH_VRS_DATAPROXY_URI=seqrepo+file://$HOME/.local/share/seqrepo/2024-12-20 \
+  RUN_INTEGRATION_TESTS=1 uv run pytest -m integration --run-integration
 ```
 
 ## Pull requests

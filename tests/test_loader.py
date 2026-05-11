@@ -297,3 +297,68 @@ def test_load_samples_gq_filter(tmp_path):
         count = load_samples("fake.vcf.gz", db_path, gq_threshold=20)
 
     assert count == 0
+
+
+def test_load_samples_no_gq_dp_format_fields(tmp_path):
+    """Verify records from VCFs without GQ/DP FORMAT fields are loaded successfully.
+
+    Population-panel VCFs (e.g. 1000 Genomes phased panels) omit per-sample
+    quality fields.  cyvcf2 raises ``KeyError`` when those fields are accessed;
+    the loader must treat the missing fields as ``None`` rather than crashing.
+
+    Args:
+        tmp_path: Pytest-provided temporary directory path.
+
+    Returns:
+        None.
+    """
+
+    db_path = tmp_path / "test.db"
+
+    mock_record = MagicMock()
+    mock_record.FILTER = None
+    mock_record.INFO.get.return_value = ["ga4gh:VA.aaa"]
+    mock_record.CHROM = "chr22"
+    mock_record.POS = 100
+    mock_record.genotypes = [[0, 1, True]]  # S1: phased HET
+
+    # Simulate cyvcf2 raising KeyError for absent FORMAT fields
+    mock_record.format.side_effect = KeyError(b"GQ")
+
+    mock_vcf = MagicMock()
+    mock_vcf.samples = ["S1"]
+    mock_vcf.__iter__ = MagicMock(return_value=iter([mock_record]))
+
+    with patch("cyvcf2.VCF", return_value=mock_vcf):
+        count = load_samples("fake.vcf.gz", db_path, gq_threshold=0)
+
+    assert count == 1
+
+
+def test_load_samples_parses_string_vrs_info(tmp_path):
+    """Verify comma-delimited INFO strings are parsed as full VRS IDs."""
+
+    db_path = tmp_path / "test.db"
+
+    mock_record = MagicMock()
+    mock_record.FILTER = None
+    mock_record.INFO.get.return_value = "ga4gh:VA.aaa,ga4gh:VA.bbb"
+    mock_record.CHROM = "chr1"
+    mock_record.POS = 100
+    mock_record.genotypes = [[1, 2, False]]  # S1 carries both ALT alleles
+    mock_record.format.side_effect = KeyError(b"GQ")
+
+    mock_vcf = MagicMock()
+    mock_vcf.samples = ["S1"]
+    mock_vcf.__iter__ = MagicMock(return_value=iter([mock_record]))
+
+    with patch("cyvcf2.VCF", return_value=mock_vcf):
+        count = load_samples("fake.vcf.gz", db_path, gq_threshold=0)
+
+    assert count == 2
+
+    conn = open_db(db_path)
+    try:
+        assert get_vrs_ids(conn, "S1") == frozenset({"ga4gh:VA.aaa", "ga4gh:VA.bbb"})
+    finally:
+        conn.close()
