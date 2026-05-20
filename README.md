@@ -17,15 +17,13 @@ uv run vrs-matcher
 
 ## Examples
 
-| TES version     | py-tes version + branch                             | Example Notebook (_Coming soon!_)           |
-| --------------- | --------------------------------------------------- | ------------------------------------------- |
-| [1.1][tes-v1.1] | [1.1.x][py-tes-v1.1] ([master][master])             | [![Open in Colab][colab-badge]][colab-v1.1] |
+| VCF                       | Notebook                               |
+|---------------------------|----------------------------------------|
+| [example_cohort.vcf][vcf] | [![Open in Colab][colab-badge]][colab] |
 
-[master]: https://github.com/ohsu-comp-bio/py-tes/tree/master
-[tes-v1.1]: https://github.com/ga4gh/task-execution-schemas/releases/tag/v1.1
-[py-tes-v1.1]: https://github.com/ohsu-comp-bio/py-tes/releases/latest
+[vcf]: ./examples/example-cohort.vcf
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
-[colab-v1.1]: https://colab.research.google.com/github/ohsu-comp-bio/py-tes/blob/master/examples/v1_1.ipynb
+[colab]: https://colab.research.google.com/github/EllrottLab/vrs-matcher/blob/3ea8a7f7b31ad48babc87d4aacf1ab38fb747512/examples/vrs-matcher.ipynb
 
 ## Development
 
