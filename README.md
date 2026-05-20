@@ -19,7 +19,7 @@ uv run vrs-matcher
 
 | VCF                       | Notebook                               |
 |---------------------------|----------------------------------------|
-| [example_cohort.vcf][vcf] | [![Open in Colab][colab-badge]][colab] |
+| [example-cohort.vcf][vcf] | [![Open in Colab][colab-badge]][colab] |
 
 [vcf]: ./examples/example-cohort.vcf
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
