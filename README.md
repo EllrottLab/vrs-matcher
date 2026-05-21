@@ -23,7 +23,7 @@ uv run vrs-matcher
 
 [vcf]: ./examples/example-cohort.vcf
 [colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
-[colab]: https://colab.research.google.com/github/EllrottLab/vrs-matcher/blob/6946746/examples/vrs-matcher.ipynb
+[colab]: https://colab.research.google.com/github/EllrottLab/vrs-matcher/blob/c4729c1/examples/vrs-matcher.ipynb
 
 ## Development
 
