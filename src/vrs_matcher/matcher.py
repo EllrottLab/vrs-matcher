@@ -7,8 +7,14 @@ set overlap and genotype concordance.
 from dataclasses import dataclass
 from enum import StrEnum
 
-from .db import get_genotype_states, get_vrs_ids, list_samples, sample_exists
 from .models import GenotypeState, Zygosity
+from .plugins import (
+    PLUGIN_API_VERSION,
+    PluginContext,
+    PluginError,
+    register_builtin,
+    resolve_plugin,
+)
 
 
 class MatchMode(StrEnum):
@@ -122,6 +128,8 @@ def match_pair(
     sample_b: str,
     *,
     candidate_vrs_ids: frozenset[str] | None = None,
+    algorithm: str = MatchMode.IDENTITY,
+    plugin_file: str | None = None,
 ) -> MatchResult:
     """Compute pairwise similarity between two samples.
 
@@ -130,6 +138,8 @@ def match_pair(
         sample_a: Query sample identifier.
         sample_b: Target sample identifier.
         candidate_vrs_ids: Optional restriction set of VRS IDs.
+        algorithm: Plugin algorithm name (default: ``identity``).
+        plugin_file: Optional local plugin script path.
 
     Returns:
         A :class:`MatchResult` containing similarity metrics and summary counts.
@@ -138,32 +148,16 @@ def match_pair(
         KeyError: If either sample ID is not registered in the index.
     """
 
-    for sid in (sample_a, sample_b):
-        if not sample_exists(conn, sid):
-            raise KeyError(sid)
-
-    ids_a = get_vrs_ids(conn, sample_a)
-    ids_b = get_vrs_ids(conn, sample_b)
-
-    if candidate_vrs_ids is not None:
-        ids_a = ids_a & candidate_vrs_ids
-        ids_b = ids_b & candidate_vrs_ids
-
-    states_a = get_genotype_states(conn, sample_a)
-    states_b = get_genotype_states(conn, sample_b)
-
-    if candidate_vrs_ids is not None:
-        states_a = {k: v for k, v in states_a.items() if k in candidate_vrs_ids}
-        states_b = {k: v for k, v in states_b.items() if k in candidate_vrs_ids}
-
-    return MatchResult(
-        sample_a=sample_a,
-        sample_b=sample_b,
-        jaccard=jaccard(ids_a, ids_b),
-        weighted_concordance=weighted_concordance(states_a, states_b),
-        shared_vrs_ids=ids_a & ids_b,
-        total_a=len(ids_a),
-        total_b=len(ids_b),
+    plugin_name = None if plugin_file is not None and algorithm == MatchMode.IDENTITY else algorithm
+    try:
+        plugin = resolve_plugin(name=plugin_name, plugin_file=plugin_file)
+    except KeyError as exc:
+        raise PluginError(f"Matcher plugin not found: {exc.args[0]}") from exc
+    return plugin.match_pair(
+        PluginContext(conn),
+        sample_a,
+        sample_b,
+        candidate_vrs_ids=candidate_vrs_ids,
     )
 
 
@@ -173,6 +167,8 @@ def match_against_all(
     *,
     top_n: int | None = None,
     candidate_vrs_ids: frozenset[str] | None = None,
+    algorithm: str = MatchMode.IDENTITY,
+    plugin_file: str | None = None,
 ) -> list[MatchResult]:
     """Match one sample against all other indexed samples.
 
@@ -181,6 +177,8 @@ def match_against_all(
         sample_id: Query sample identifier.
         top_n: Optional maximum number of results to return.
         candidate_vrs_ids: Optional restriction set of VRS IDs.
+        algorithm: Plugin algorithm name (default: ``identity``).
+        plugin_file: Optional local plugin script path.
 
     Returns:
         List of match results sorted by descending Jaccard score.
@@ -189,14 +187,90 @@ def match_against_all(
         KeyError: If ``sample_id`` is not registered in the index.
     """
 
-    if not sample_exists(conn, sample_id):
-        raise KeyError(sample_id)
+    plugin_name = None if plugin_file is not None and algorithm == MatchMode.IDENTITY else algorithm
+    try:
+        plugin = resolve_plugin(name=plugin_name, plugin_file=plugin_file)
+    except KeyError as exc:
+        raise PluginError(f"Matcher plugin not found: {exc.args[0]}") from exc
+    return plugin.match_against_all(
+        PluginContext(conn),
+        sample_id,
+        top_n=top_n,
+        candidate_vrs_ids=candidate_vrs_ids,
+    )
 
-    others = [s for s in list_samples(conn) if s != sample_id]
-    results = [
-        match_pair(conn, sample_id, other, candidate_vrs_ids=candidate_vrs_ids) for other in others
-    ]
-    results.sort(key=lambda r: r.jaccard, reverse=True)
-    if top_n is not None:
-        results = results[:top_n]
-    return results
+
+class IdentityMatcherPlugin:
+    """Default built-in matcher plugin based on Jaccard + concordance."""
+
+    name = MatchMode.IDENTITY
+    api_version = PLUGIN_API_VERSION
+
+    def match_pair(
+        self,
+        context: PluginContext,
+        sample_a: str,
+        sample_b: str,
+        *,
+        candidate_vrs_ids: frozenset[str] | None = None,
+    ) -> MatchResult:
+        """Compute pairwise sample similarity using the identity model."""
+
+        for sid in (sample_a, sample_b):
+            if not context.sample_exists(sid):
+                raise KeyError(sid)
+
+        ids_a = context.get_vrs_ids(sample_a)
+        ids_b = context.get_vrs_ids(sample_b)
+
+        if candidate_vrs_ids is not None:
+            ids_a = ids_a & candidate_vrs_ids
+            ids_b = ids_b & candidate_vrs_ids
+
+        states_a = context.get_genotype_states(sample_a)
+        states_b = context.get_genotype_states(sample_b)
+
+        if candidate_vrs_ids is not None:
+            states_a = {k: v for k, v in states_a.items() if k in candidate_vrs_ids}
+            states_b = {k: v for k, v in states_b.items() if k in candidate_vrs_ids}
+
+        return MatchResult(
+            sample_a=sample_a,
+            sample_b=sample_b,
+            jaccard=jaccard(ids_a, ids_b),
+            weighted_concordance=weighted_concordance(states_a, states_b),
+            shared_vrs_ids=ids_a & ids_b,
+            total_a=len(ids_a),
+            total_b=len(ids_b),
+        )
+
+    def match_against_all(
+        self,
+        context: PluginContext,
+        sample_id: str,
+        *,
+        top_n: int | None = None,
+        candidate_vrs_ids: frozenset[str] | None = None,
+    ) -> list[MatchResult]:
+        """Match one sample against all other indexed samples."""
+
+        if not context.sample_exists(sample_id):
+            raise KeyError(sample_id)
+
+        others = [s for s in context.list_samples() if s != sample_id]
+        results = [
+            self.match_pair(
+                context,
+                sample_id,
+                other,
+                candidate_vrs_ids=candidate_vrs_ids,
+            )
+            for other in others
+        ]
+        results.sort(key=lambda r: r.jaccard, reverse=True)
+        if top_n is not None:
+            results = results[:top_n]
+        return results
+
+
+register_builtin(IdentityMatcherPlugin(), replace=True)
