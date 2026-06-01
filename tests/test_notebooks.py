@@ -15,7 +15,9 @@ def _notebook_code_sources(path: Path) -> list[str]:
     """Return the source of all code cells in a notebook file."""
 
     notebook = json.loads(path.read_text(encoding="utf-8"))
-    return ["".join(cell.get("source", [])) for cell in notebook.get("cells", []) if cell.get("cell_type") == "code"]
+    return ["".join(cell.get("source", []))
+            for cell in notebook.get("cells", [])
+            if cell.get("cell_type") == "code"]
 
 
 def test_example_notebook_contains_matcher_workflow() -> None:

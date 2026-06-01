@@ -7,8 +7,8 @@ loading behavior using mocked ``cyvcf2`` records.
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from vrs_matcher.db import get_vrs_ids, open_db
 from vrs_matcher import loader as loader_mod
+from vrs_matcher.db import get_vrs_ids, open_db
 from vrs_matcher.loader import _format_scalar, _zygosity, genotype_to_vrs_ids, load_samples
 from vrs_matcher.models import Zygosity
 
@@ -437,7 +437,8 @@ def test_iter_rows_skips_filtered_missing_and_threshold_failures():
 def test_load_samples_flushes_batches_and_closes_connection(tmp_path, monkeypatch):
     """Verify load_samples flushes large batches and closes the DB connection."""
 
-    rows = [("S1", f"ga4gh:VA.{i}", "0/1", "HET", "chr1", i, None, None, None) for i in range(10_001)]
+    rows = [("S1", f"ga4gh:VA.{i}", "0/1", "HET", "chr1", i, None, None, None)
+            for i in range(10_001)]
     insert_calls: list[int] = []
 
     class DummyConn:
@@ -451,7 +452,8 @@ def test_load_samples_flushes_batches_and_closes_connection(tmp_path, monkeypatc
 
     monkeypatch.setattr(loader_mod, "open_db", lambda path: dummy_conn)
     monkeypatch.setattr(loader_mod, "register_samples", lambda conn, sample_ids: None)
-    monkeypatch.setattr(loader_mod, "insert_alleles", lambda conn, batch: insert_calls.append(len(batch)))
+    monkeypatch.setattr(loader_mod, "insert_alleles",
+                        lambda conn, batch: insert_calls.append(len(batch)))
 
     header = MagicMock()
     header.samples = ["S1"]
