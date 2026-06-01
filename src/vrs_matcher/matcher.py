@@ -146,6 +146,7 @@ def match_pair(
 
     Raises:
         KeyError: If either sample ID is not registered in the index.
+        PluginError: If plugin resolution fails for ``algorithm`` or ``plugin_file``.
     """
 
     plugin_name = None if plugin_file is not None and algorithm == MatchMode.IDENTITY else algorithm
@@ -185,6 +186,7 @@ def match_against_all(
 
     Raises:
         KeyError: If ``sample_id`` is not registered in the index.
+        PluginError: If plugin resolution fails for ``algorithm`` or ``plugin_file``.
     """
 
     plugin_name = None if plugin_file is not None and algorithm == MatchMode.IDENTITY else algorithm
