@@ -237,8 +237,3 @@ def resolve_plugin(
         raise PluginError("A plugin name is required when --plugin-file is not used.")
 
     return get_plugin(name)
-
-    if name is None:
-        raise PluginError("A plugin name is required when --plugin-file is not used.")
-
-    return get_plugin(name)
