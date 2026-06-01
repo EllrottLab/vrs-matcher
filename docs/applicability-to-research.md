@@ -183,6 +183,31 @@ Typical scenarios include:
 - checking whether incoming partner data overlap with an existing repository;
 - validating the uniqueness of samples included in a public release.
 
+#### Implementation status in current codebase
+
+The current implementation includes the core features needed to support this use
+case:
+
+- **Cohort ingestion** via `load_samples`, which can load multiple releases into
+  the same SQLite index while preserving `source_dataset` provenance.
+- **Pairwise QC checks** via `match_pair` and the CLI command `match-samples`
+  for confirming candidate duplicates or investigating suspicious overlaps.
+- **One-vs-all cohort screening** via `match_against_all` and the CLI command
+  `match-sample`, which ranks likely duplicate or near-duplicate samples for a
+  query sample.
+- **Manual follow-up** via `shared-variants` to inspect the exact normalized
+  alleles driving a potential duplicate or release overlap.
+
+Operational constraints to account for during release QC:
+
+- Input VCFs must already be annotated with `VRS_Allele_IDs`.
+- Sample IDs are globally keyed in the index (`samples.sample_id` is unique), so
+  if the same biological sample appears with the same name in two releases, one
+  release should be renamed or prefixed before loading if both entries must
+  coexist in the same index.
+- Matching is allele/zygosity based and should be interpreted as normalized
+  sample similarity, not as kinship or identity-by-descent inference.
+
 ### 4. Cross-study harmonization
 
 When cohorts are merged across sequencing centers or analysis pipelines, raw VCF
