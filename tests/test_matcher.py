@@ -339,3 +339,207 @@ class TestMatchPairKeyError:
 
         with pytest.raises(KeyError, match="GHOST"):
             match_pair(populated_db, "S1", "GHOST")
+
+
+class TestSampleIdentityConfirmationUseCase:
+    """Tests for identity-confirmation style matching workflows."""
+
+    @pytest.fixture
+    def identity_db(self, db_conn):
+        """Populate a DB with near-duplicate and unrelated samples."""
+
+        rows = [
+            ("BASELINE", "ga4gh:VA.v1", "0/1", "HET", "chr1", 101, 50.0, 30, "run1"),
+            ("BASELINE", "ga4gh:VA.v2", "1/1", "HOM_ALT", "chr1", 102, 50.0, 30, "run1"),
+            ("BASELINE", "ga4gh:VA.v3", "0/1", "HET", "chr1", 103, 50.0, 30, "run1"),
+            ("BASELINE", "ga4gh:VA.v4", "1/1", "HOM_ALT", "chr1", 104, 50.0, 30, "run1"),
+            # Resequenced/reprocessed sample with one extra allele and one zygosity mismatch.
+            ("RESEQ", "ga4gh:VA.v1", "0/1", "HET", "chr1", 101, 50.0, 30, "run2"),
+            ("RESEQ", "ga4gh:VA.v2", "1/1", "HOM_ALT", "chr1", 102, 50.0, 30, "run2"),
+            ("RESEQ", "ga4gh:VA.v3", "0/1", "HET", "chr1", 103, 50.0, 30, "run2"),
+            ("RESEQ", "ga4gh:VA.v4", "0/1", "HET", "chr1", 104, 50.0, 30, "run2"),
+            ("RESEQ", "ga4gh:VA.v5", "0/1", "HET", "chr1", 105, 50.0, 30, "run2"),
+            # Unrelated sample with minimal overlap.
+            ("UNRELATED", "ga4gh:VA.v1", "0/1", "HET", "chr1", 101, 50.0, 30, "run3"),
+            ("UNRELATED", "ga4gh:VA.v6", "0/1", "HET", "chr1", 106, 50.0, 30, "run3"),
+            ("UNRELATED", "ga4gh:VA.v7", "1/1", "HOM_ALT", "chr1", 107, 50.0, 30, "run3"),
+        ]
+        insert_alleles(db_conn, rows)
+        return db_conn
+
+    def test_pair_metrics_support_identity_confirmation(self, identity_db):
+        """Near-duplicate samples should score high on overlap and concordance."""
+
+        result = match_pair(identity_db, "BASELINE", "RESEQ")
+        assert result.jaccard == pytest.approx(0.8)
+        assert result.weighted_concordance == pytest.approx(0.875)
+        assert len(result.shared_vrs_ids) == 4
+
+    def test_resequenced_sample_ranks_first_in_one_vs_all(self, identity_db):
+        """The most similar resequenced sample should be the top hit."""
+
+        results = match_against_all(identity_db, "BASELINE")
+        assert results[0].sample_b == "RESEQ"
+        assert results[0].jaccard > results[1].jaccard
+
+
+class TestCohortDeduplicationQualityControlUseCase:
+    """Tests for cohort deduplication and data release QC workflows."""
+
+    @pytest.fixture
+    def dedup_db(self, db_conn):
+        """Populate a DB with release-style duplicate and unrelated samples."""
+
+        rows = [
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v1",
+                "0/1",
+                "HET",
+                "chr1",
+                101,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v2",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                102,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v3",
+                "0/1",
+                "HET",
+                "chr1",
+                103,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            (
+                "REFERENCE_RELEASE_SAMPLE",
+                "ga4gh:VA.v4",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                104,
+                50.0,
+                30,
+                "reference_release",
+            ),
+            # Incoming release sample with one extra allele and one zygosity mismatch.
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v1",
+                "0/1",
+                "HET",
+                "chr1",
+                101,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v2",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                102,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v3",
+                "0/1",
+                "HET",
+                "chr1",
+                103,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v4",
+                "0/1",
+                "HET",
+                "chr1",
+                104,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_DUP",
+                "ga4gh:VA.v5",
+                "0/1",
+                "HET",
+                "chr1",
+                105,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            # Unrelated sample with minimal overlap.
+            (
+                "INCOMING_RELEASE_UNRELATED",
+                "ga4gh:VA.v1",
+                "0/1",
+                "HET",
+                "chr1",
+                101,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_UNRELATED",
+                "ga4gh:VA.v6",
+                "0/1",
+                "HET",
+                "chr1",
+                106,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+            (
+                "INCOMING_RELEASE_UNRELATED",
+                "ga4gh:VA.v7",
+                "1/1",
+                "HOM_ALT",
+                "chr1",
+                107,
+                50.0,
+                30,
+                "incoming_release",
+            ),
+        ]
+        insert_alleles(db_conn, rows)
+        return db_conn
+
+    def test_pair_metrics_support_release_qc(self, dedup_db):
+        """Release duplicates should have strong overlap and concordance."""
+
+        result = match_pair(dedup_db, "REFERENCE_RELEASE_SAMPLE", "INCOMING_RELEASE_DUP")
+        assert result.jaccard == pytest.approx(0.8)
+        assert result.weighted_concordance == pytest.approx(0.875)
+        assert len(result.shared_vrs_ids) == 4
+
+    def test_incoming_release_sample_ranks_duplicate_first(self, dedup_db):
+        """The duplicate candidate should be the top-ranked cohort match."""
+
+        results = match_against_all(dedup_db, "INCOMING_RELEASE_DUP")
+        assert results[0].sample_b == "REFERENCE_RELEASE_SAMPLE"
+        assert results[0].jaccard > results[1].jaccard

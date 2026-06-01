@@ -27,6 +27,17 @@ integration = [
 requires = ["hatchling>=1.25.0"]
 build-backend = "hatchling.build"
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/vrs_matcher"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "src/vrs_matcher",
+  "tests",
+  "README.md",
+  "pyproject.toml",
+]
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -47,6 +58,7 @@ vrs-matcher = "vrs_matcher.cli:cli"
 minversion = "8.0"
 addopts = "-ra --cov=vrs_matcher --cov-report=xml --cov-report=term-missing"
 testpaths = ["tests"]
+pythonpath = ["src"]
 markers = [
   "integration: slow tests requiring network access (deselect with '-m not integration')",
 ]
