@@ -12,12 +12,19 @@ git clone https://github.com/EllrottLab/vrs-matcher
 
 cd vrs-matcher
 
-uv sync
-
 uv run vrs-matcher
 ```
 
-## User Guides
+
+## Examples
+
+| VCF                       | Notebook                               |
+|---------------------------|----------------------------------------|
+| [example-cohort.vcf][vcf] | [![Open in Colab][colab-badge]][colab] |
+
+[vcf]: ./examples/example-cohort.vcf
+[colab-badge]: https://colab.research.google.com/assets/colab-badge.svg
+[colab]: https://colab.research.google.com/github/EllrottLab/vrs-matcher/blob/8a620f6/examples/vrs-matcher.ipynb
 
 - [Sample identity confirmation with your own VCFs](docs/how-to-sample-identity-confirmation.md)
 - [Cohort deduplication and data release QC with your own VCFs](docs/how-to-cohort-dedup-qc.md)
