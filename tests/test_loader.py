@@ -429,16 +429,15 @@ def test_iter_rows_skips_filtered_missing_and_threshold_failures():
             )
         )
 
-    assert rows == [
-        ("S1", "ga4gh:VA.keep", "1/1", "HOM_ALT", "chr1", 100, 99.0, 9, None)
-    ]
+    assert rows == [("S1", "ga4gh:VA.keep", "1/1", "HOM_ALT", "chr1", 100, 99.0, 9, None)]
 
 
 def test_load_samples_flushes_batches_and_closes_connection(tmp_path, monkeypatch):
     """Verify load_samples flushes large batches and closes the DB connection."""
 
-    rows = [("S1", f"ga4gh:VA.{i}", "0/1", "HET", "chr1", i, None, None, None)
-            for i in range(10_001)]
+    rows = [
+        ("S1", f"ga4gh:VA.{i}", "0/1", "HET", "chr1", i, None, None, None) for i in range(10_001)
+    ]
     insert_calls: list[int] = []
 
     class DummyConn:
@@ -452,8 +451,9 @@ def test_load_samples_flushes_batches_and_closes_connection(tmp_path, monkeypatc
 
     monkeypatch.setattr(loader_mod, "open_db", lambda path: dummy_conn)
     monkeypatch.setattr(loader_mod, "register_samples", lambda conn, sample_ids: None)
-    monkeypatch.setattr(loader_mod, "insert_alleles",
-                        lambda conn, batch: insert_calls.append(len(batch)))
+    monkeypatch.setattr(
+        loader_mod, "insert_alleles", lambda conn, batch: insert_calls.append(len(batch))
+    )
 
     header = MagicMock()
     header.samples = ["S1"]
@@ -471,4 +471,3 @@ def test_load_samples_flushes_batches_and_closes_connection(tmp_path, monkeypatc
     assert insert_calls == [10_000, 1]
     assert dummy_conn.closed is True
     assert header.close.called is True
-
