@@ -96,12 +96,17 @@ def _iter_entry_points() -> list[Any]:
 def _instantiate_plugin(obj: Any) -> Any:
     """Instantiate plugin objects returned as classes or factories."""
 
+    # Entry points may expose an instance, a plugin class (zero-arg ctor), or a
+    # zero-arg factory returning either of those.
+    if isinstance(obj, type):
+        return obj()  # may raise TypeError; caller will handle
+
     if hasattr(obj, "match_pair") and hasattr(obj, "match_against_all"):
         return obj
+
     if callable(obj):
-        candidate = obj()
-        if hasattr(candidate, "match_pair") and hasattr(candidate, "match_against_all"):
-            return candidate
+        return _instantiate_plugin(obj())
+
     return obj
 
 
@@ -222,9 +227,16 @@ def resolve_plugin(
 
     if plugin_file is not None:
         plugin = load_script_plugin(plugin_file)
-        if name is not None and plugin.name != name:
+        # When using a script plugin, treat the default name ("identity") as
+        # "no constraint" so callers don't have to pass name=None explicitly.
+        if name not in (None, "identity") and plugin.name != name:
             raise KeyError(name)
         return plugin
+
+    if name is None:
+        raise PluginError("A plugin name is required when --plugin-file is not used.")
+
+    return get_plugin(name)
 
     if name is None:
         raise PluginError("A plugin name is required when --plugin-file is not used.")
