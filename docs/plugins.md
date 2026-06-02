@@ -114,6 +114,22 @@ When using `--plugin-file`, you usually do **not** need `--algorithm`.
 
 If you do provide `--algorithm`, it must match the plugin's `name`.
 
+## Plugin loading flow
+
+At runtime, plugin loading follows this order:
+
+1. **Built-in plugins** are registered when `vrs_matcher.matcher` is imported. The
+   built-in identity matcher is defined in `src/vrs_matcher/matcher.py` and
+   registered with `register_builtin(...)`.
+2. **Package plugins** are discovered from the `vrs_matcher.plugins` entry-point
+   group and loaded through Python package metadata.
+3. **Script plugins** are loaded directly from a local `.py` file when
+   `--plugin-file` is supplied. The file must define `create_plugin()`.
+
+The public matching functions in `src/vrs_matcher/matcher.py` call
+`resolve_plugin(...)`, which selects the built-in plugin, an installed package
+plugin, or a script plugin depending on the command-line arguments.
+
 ## Plugin contract
 
 A plugin object must define all of the following:
@@ -491,6 +507,8 @@ Your plugin's `api_version` does not match the current plugin API expected by
 Set:
 
 ```python
+from vrs_matcher.plugins import PLUGIN_API_VERSION
+
 api_version = PLUGIN_API_VERSION
 ```
 
