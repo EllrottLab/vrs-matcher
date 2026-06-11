@@ -52,6 +52,15 @@ At runtime, `resolve_plugin(...)` (called by the public functions in
 
 ## Quick start
 
+The matching commands read an existing database, so first build one from a
+VRS-annotated VCF with `load-samples` (the how-to guides cover this in full):
+
+```bash
+uv run vrs-matcher load-samples examples/example-cohort.vcf.gz --db matches.db
+```
+
+Then run plugins against it:
+
 ```bash
 # See available built-in and installed plugins
 uv run vrs-matcher plugins list

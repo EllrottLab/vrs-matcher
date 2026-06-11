@@ -60,6 +60,7 @@ controls how indexed samples are compared after loading.
 
 ```bash
 uv run vrs-matcher plugins list
+uv run vrs-matcher load-samples examples/example-cohort.vcf --db matches.db
 uv run vrs-matcher match-sample SAMPLE_A --db matches.db --algorithm identity
 uv run vrs-matcher match-sample SAMPLE_A --db matches.db --plugin-file examples/plugins/jaccard_floor_plugin.py
 ```
@@ -116,6 +117,6 @@ intra-super-population Jaccard is higher than inter-super-population Jaccard.
 ├── src/             # package code
 ├── tests/           # test suite
 ├── docs/            # usage guides (e.g. plugins.md)
-├── examples/        # runnable examples, including plugin templates
+├── examples/        # runnable examples + sample data (see examples/README.md)
 └── scripts/         # helper / maintenance scripts
 ```
