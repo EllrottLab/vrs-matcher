@@ -113,7 +113,9 @@ intra-super-population Jaccard is higher than inter-super-population Jaccard.
 ```text
 ./vrs-matcher
 ├── pyproject.toml   # project metadata + tool configuration
-├── src
-│   └── vrs_matcher  # package code
-└── tests            # test suite
+├── src/             # package code
+├── tests/           # test suite
+├── docs/            # usage guides (e.g. plugins.md)
+├── examples/        # runnable examples, including plugin templates
+└── scripts/         # helper / maintenance scripts
 ```
