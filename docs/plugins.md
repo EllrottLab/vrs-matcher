@@ -1,8 +1,8 @@
 # Matcher plugins
 
-`vrs-matcher` can run matching algorithms supplied by users, not just the
+`vrs-matcher` supports matching algorithms supplied by users, not just the
 built-in `identity` algorithm. Write a plugin when the built-in matcher is
-close, but not quite the scoring or ranking logic you need — for example:
+close but not quite the scoring or ranking logic you need, for example:
 
 - weighting rare or clinically important variants more heavily,
 - restricting matching to a candidate gene list or panel,
@@ -15,11 +15,11 @@ tool when you need different scoring or ranking behavior.
 
 ## What a plugin can and cannot change
 
-A plugin changes **how samples are scored and ranked** after data are loaded
+A plugin changes how samples are scored and ranked after data are loaded
 into the SQLite index. It operates on indexed sample-level allele/genotype
 data, not raw VCF records.
 
-Plugins do **not** replace VCF parsing, VRS allele extraction, SQLite storage,
+Plugins do not replace VCF parsing, VRS allele extraction, SQLite storage,
 or the `MatchResult` output structure.
 
 ## Plugin sources and selection
@@ -28,26 +28,26 @@ There are three plugin sources, selected on the command line:
 
 | Source | How to select | Notes |
 | --- | --- | --- |
-| **Built-in** (shipped with `vrs-matcher`) | `--algorithm identity` | |
-| **Entry-point** (from an installed package) | `--algorithm my-plugin` | See [Packaging](#packaging-a-reusable-plugin) |
-| **Local script** (a `.py` file) | `--plugin-file my_plugin.py` | Usually no `--algorithm` needed |
+| Built-in (shipped with `vrs-matcher`) | `--algorithm identity` | |
+| Entry-point (from an installed package) | `--algorithm my-plugin` | See [Packaging](#packaging-a-reusable-plugin) |
+| Local script (a `.py` file) | `--plugin-file my_plugin.py` | Usually no `--algorithm` needed |
 
 When using `--plugin-file`, you do not need `--algorithm`; if you supply it
 anyway, it must match the plugin's `name`.
 
-The recommended path is to start with a local script plugin, test it on your
-cohort, then package it as an entry-point plugin if you want to share it.
+Start with a local script plugin, test it on your cohort, then package it as
+an entry-point plugin if you want to share it.
 
 ### Loading order
 
 At runtime, `resolve_plugin(...)` (called by the public functions in
 `src/vrs_matcher/matcher.py`) selects a plugin in this order:
 
-1. **Built-in plugins** — registered with `register_builtin(...)` when
+1. Built-in plugins, registered with `register_builtin(...)` when
    `vrs_matcher.matcher` is imported (the identity matcher lives there).
-2. **Package plugins** — discovered from the `vrs_matcher.plugins` entry-point
+2. Package plugins, discovered from the `vrs_matcher.plugins` entry-point
    group via package metadata.
-3. **Script plugins** — loaded from the `--plugin-file` path; the file must
+3. Script plugins, loaded from the `--plugin-file` path; the file must
    define `create_plugin()`.
 
 ## Quick start
@@ -74,27 +74,27 @@ uv run vrs-matcher match-samples SAMPLE_A SAMPLE_B --db matches.db \
 
 The repository includes a complete worked example,
 `examples/plugins/jaccard_floor_plugin.py`. It behaves like the built-in
-identity matcher but enforces a minimum Jaccard score floor — a teaching
+identity matcher but enforces a minimum Jaccard score floor. It's a teaching
 example, not a recommended production method.
 
 ## Plugin contract
 
 A plugin object must define:
 
-- `name` — unique plugin name, e.g. `"identity"` or `"rare-priority"`
-- `api_version` — currently `"1"` (use `PLUGIN_API_VERSION`)
+- `name`: unique plugin name, e.g. `"identity"` or `"rare-priority"`
+- `api_version`: currently `"1"` (use `PLUGIN_API_VERSION`)
 - `match_pair(context, sample_a, sample_b, *, candidate_vrs_ids=None) -> MatchResult`
 - `match_against_all(context, sample_id, *, top_n=None, candidate_vrs_ids=None) -> list[MatchResult]`
 
-A **script plugin** file must additionally define `create_plugin()`, returning
-the plugin object.
+A script plugin file must also define `create_plugin()`, returning the plugin
+object.
 
 ### Input: the `context` object
 
 Plugins receive a read-only `context` object instead of direct SQL access, so
 plugin code stays decoupled from the database schema. By the time a plugin
 runs, samples are loaded, VRS IDs are normalized, and genotype states are
-available per sample — the plugin only needs to focus on scoring.
+available per sample. The plugin only needs to focus on scoring.
 
 Available helpers:
 
@@ -193,7 +193,7 @@ Validate on data where the expected answer is already known. Useful checks:
 
 Keep a small regression dataset so you can verify behavior after every change.
 Prefer simple, explainable scoring rules over opaque heuristics, especially for
-QC or sample-identity decisions, and treat `context` as read-only — never
+QC or sample-identity decisions, and treat `context` as read-only. Do not
 assume anything about internal DB tables.
 
 ## Example plugin ideas
@@ -204,9 +204,9 @@ kinds of ranking logic a plugin can implement.
 ### Rare-variant-weighted identity confirmation
 
 Useful when confirming two samples came from the same donor but you want rare
-variants to count for more than common ones — e.g. matching a resequenced
-sample to an earlier run, catching a swapped tumor-normal pair, or confirming
-identity across sequencing centers.
+variants to count more than common ones, e.g. matching a resequenced sample to
+an earlier run, catching a swapped tumor-normal pair, or confirming identity
+across sequencing centers.
 
 The default matcher treats all indexed alleles equally, which can understate
 rare, high-information variants. Such a plugin could assign each VRS ID a weight
@@ -217,10 +217,10 @@ and optionally penalize discordance at rare loci more heavily. Conceptually:
 - uncommon allele: weight = 3
 - rare allele: weight = 10
 
-So samples sharing several rare alleles rank above samples matching mostly on
+Samples sharing several rare alleles rank above samples matching mostly on
 common ones.
 
-**Data needed:** an external notion of variant frequency — internal cohort
+**Data needed:** an external notion of variant frequency: internal cohort
 allele frequencies, release-specific site frequencies, panel rarity tiers, or a
 hand-maintained allowlist. Weights can be hard-coded for a prototype, loaded
 from a sidecar file, or packaged with the plugin.
@@ -232,10 +232,10 @@ be explicit that `jaccard` now holds a weighted identity score.
 ### Candidate-gene-only matching
 
 Useful when matching should be driven only by variants in genes, regions, or
-panels relevant to a disease or study question — e.g. a cardiomyopathy panel,
+panels relevant to a disease or study question, e.g. a cardiomyopathy panel,
 inherited-cancer-predisposition genes, or a curated research panel. The question
-shifts from genome-wide identity to "are these samples similar *within the genes
-I care about*?"
+shifts from genome-wide identity to whether these samples are similar within the
+genes you care about.
 
 This is often the simplest custom plugin, because the core logic can be
 identical to the built-in matcher after filtering. Such a plugin could restrict
@@ -252,7 +252,7 @@ rankings; make sure QC users know the matching is panel-restricted.
 
 ### Combining the two
 
-A plugin could restrict matching to a candidate gene set *and* weight variants
+A plugin could restrict matching to a candidate gene set and weight variants
 within it by rarity or predicted impact. This suits phenotype-driven research
 but should be validated carefully, since the score becomes more specialized and
 less comparable to ordinary genome-wide identity matching.
