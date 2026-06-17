@@ -4,7 +4,6 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-
 from vrs_matcher.plugins import resolve_plugin
 from vrs_matcher.storage import open_db
 
