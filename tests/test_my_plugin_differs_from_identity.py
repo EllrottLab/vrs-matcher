@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from vrs_matcher.matcher import match_sample
+from vrs_matcher.plugins import resolve_plugin
 from vrs_matcher.storage import open_db
 
 
@@ -20,6 +20,38 @@ def _load_plugin(path: Path):
     return module.create_plugin()
 
 
+class _Context:
+    """Minimal plugin context backed by the project SQLite schema."""
+
+    def __init__(self, conn):
+        self.conn = conn
+
+    def sample_exists(self, sample_id: str) -> bool:
+        row = self.conn.execute(
+            "SELECT 1 FROM sample WHERE sample_id = ? LIMIT 1",
+            (sample_id,),
+        ).fetchone()
+        return row is not None
+
+    def list_samples(self):
+        rows = self.conn.execute("SELECT sample_id FROM sample ORDER BY sample_id").fetchall()
+        return [r[0] for r in rows]
+
+    def get_vrs_ids(self, sample_id: str):
+        rows = self.conn.execute(
+            "SELECT DISTINCT vrs_id FROM allele WHERE sample_id = ?",
+            (sample_id,),
+        ).fetchall()
+        return {r[0] for r in rows}
+
+    def get_genotype_states(self, sample_id: str):
+        rows = self.conn.execute(
+            "SELECT vrs_id, genotype FROM allele WHERE sample_id = ?",
+            (sample_id,),
+        ).fetchall()
+        return {r[0]: r[1] for r in rows}
+
+
 @pytest.mark.integration
 def test_my_plugin_differs_from_identity():
     db = Path("tests/data/matches.db")
@@ -30,23 +62,23 @@ def test_my_plugin_differs_from_identity():
     if not plugin_file.exists():
         pytest.skip("examples/plugins/my_plugin.py not present in this environment")
 
-    plugin = _load_plugin(plugin_file)
+    my_plugin = _load_plugin(plugin_file)
 
-    # Pick a query sample by reading one from DB.
-    # Uses only public APIs available in this repo.
     with open_db(str(db), read_only=True) as conn:
-        rows = conn.execute("SELECT sample_id FROM sample ORDER BY sample_id LIMIT 1").fetchall()
-        if not rows:
-            pytest.skip("No samples found in tests/data/matches.db")
-        query = rows[0][0]
+        ctx = _Context(conn)
+        samples = ctx.list_samples()
+        if len(samples) < 2:
+            pytest.skip("Need at least 2 samples to compare")
 
-    identity = match_sample(str(db), query, top_n=10, algorithm="identity")
-    custom = match_sample(str(db), query, top_n=10, plugin=plugin, algorithm=plugin.name)
+        query = samples[0]
 
-    by_identity = {r.sample_b: r for r in identity}
-    by_custom = {r.sample_b: r for r in custom}
+        identity_plugin = resolve_plugin("identity")
+        identity_results = identity_plugin.match_against_all(ctx, query, top_n=10)
+        custom_results = my_plugin.match_against_all(ctx, query, top_n=10)
+
+    by_identity = {r.sample_b: r for r in identity_results}
+    by_custom = {r.sample_b: r for r in custom_results}
     common = set(by_identity) & set(by_custom)
-
     assert common, "No overlapping compared samples"
 
     differs = any(
