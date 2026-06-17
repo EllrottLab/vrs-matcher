@@ -23,7 +23,7 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from vrs_matcher.matcher import MatchContext, match_sample
+from vrs_matcher.matcher import match_sample
 from vrs_matcher.storage import open_db
 
 
@@ -67,26 +67,28 @@ def main() -> int:
     my_plugin = _load_script_plugin(plugin_path)
 
     with open_db(str(db_path), read_only=True) as conn:
-        context = MatchContext(conn)
-
-        if not context.sample_exists(args.sample):
+        rows = conn.execute(
+            "SELECT sample_id FROM sample WHERE sample_id = ? LIMIT 1",
+            (args.sample,),
+        ).fetchall()
+        if not rows:
             print(f"ERROR: sample not found: {args.sample}", file=sys.stderr)
             return 1
 
-        identity_results = match_sample(
-            conn,
-            args.sample,
-            top_n=args.top,
-            algorithm="identity",
-        )
+    identity_results = match_sample(
+        str(db_path),
+        args.sample,
+        top_n=args.top,
+        algorithm="identity",
+    )
 
-        my_results = match_sample(
-            conn,
-            args.sample,
-            top_n=args.top,
-            plugin=my_plugin,
-            algorithm=my_plugin.name,
-        )
+    my_results = match_sample(
+        str(db_path),
+        args.sample,
+        top_n=args.top,
+        plugin=my_plugin,
+        algorithm=my_plugin.name,
+    )
 
     idx_identity = _index_by_sample(identity_results)
     idx_my = _index_by_sample(my_results)
