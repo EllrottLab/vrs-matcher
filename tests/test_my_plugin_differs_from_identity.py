@@ -5,8 +5,9 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from vrs_matcher.plugins import resolve_plugin, PluginContext
-from vrs_matcher.db import open_db, insert_alleles
+
+from vrs_matcher.db import insert_alleles, open_db
+from vrs_matcher.plugins import PluginContext, resolve_plugin
 
 
 def _load_plugin(path: Path):
@@ -48,17 +49,13 @@ def test_my_plugin_differs_from_identity():
                 ("S1", "ga4gh:VA.common", "0/1", "HET", "chr1", 100, 30.0, 20, None),
                 ("S1", "ga4gh:VA.uncommon", "0/1", "HET", "chr1", 200, 30.0, 20, None),
                 ("S1", "ga4gh:VA.rare", "0/1", "HET", "chr1", 300, 30.0, 20, None),
-
                 # S2: has common + uncommon (overlaps with S1 on common+uncommon)
                 ("S2", "ga4gh:VA.common", "0/1", "HET", "chr1", 100, 30.0, 20, None),
                 ("S2", "ga4gh:VA.uncommon", "0/1", "HET", "chr1", 200, 30.0, 20, None),
-
                 # S3: has common only
                 ("S3", "ga4gh:VA.common", "0/1", "HET", "chr1", 100, 30.0, 20, None),
-
                 # S4: has common only
                 ("S4", "ga4gh:VA.common", "0/1", "HET", "chr1", 100, 30.0, 20, None),
-
                 # S5: has common + unique allele (for diversity)
                 ("S5", "ga4gh:VA.common", "0/1", "HET", "chr1", 100, 30.0, 20, None),
                 ("S5", "ga4gh:VA.unique_to_s5", "0/1", "HET", "chr1", 400, 30.0, 20, None),
@@ -84,8 +81,7 @@ def test_my_plugin_differs_from_identity():
 
         # Check that at least one comparison differs
         differs = any(
-            abs(float(by_custom[s].jaccard) - float(by_identity[s].jaccard)) > 1e-12
-            for s in common
+            abs(float(by_custom[s].jaccard) - float(by_identity[s].jaccard)) > 1e-12 for s in common
         )
         assert differs, (
             f"my-plugin scores are identical to identity; expected at least one difference. "

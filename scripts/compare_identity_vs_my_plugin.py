@@ -23,8 +23,9 @@ import importlib.util
 import sys
 from pathlib import Path
 
-from vrs_matcher.matcher import match_sample
 from vrs_matcher.storage import open_db
+
+from vrs_matcher.matcher import match_sample
 
 
 def _load_script_plugin(path: Path):
