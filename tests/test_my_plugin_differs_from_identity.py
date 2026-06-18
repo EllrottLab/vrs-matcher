@@ -20,7 +20,6 @@ def _load_plugin(path: Path):
     return module.create_plugin()
 
 
-@pytest.mark.integration
 def test_my_plugin_differs_from_identity():
     """Test that my_plugin produces different scores than identity plugin.
 
