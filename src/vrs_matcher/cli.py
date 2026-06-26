@@ -9,6 +9,7 @@ import click
 from .db import open_db
 from .loader import DEFAULT_DP_THRESHOLD, DEFAULT_GQ_THRESHOLD, load_samples
 from .matcher import match_against_all, match_pair
+from .plugins import PluginError, list_plugins
 
 
 @click.group()
@@ -58,7 +59,25 @@ def load_samples_cmd(vcf: str, db: str, source_dataset: str, gq: float, dp: int)
 @click.argument("sample_a")
 @click.argument("sample_b")
 @click.option("--db", required=True, type=click.Path(exists=True), help="Path to SQLite database.")
-def match_samples_cmd(sample_a: str, sample_b: str, db: str) -> None:
+@click.option(
+    "--algorithm",
+    default="identity",
+    show_default=True,
+    help="Matching plugin algorithm name.",
+)
+@click.option(
+    "--plugin-file",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Path to a local Python plugin file with create_plugin().",
+)
+def match_samples_cmd(
+    sample_a: str,
+    sample_b: str,
+    db: str,
+    algorithm: str,
+    plugin_file: str | None,
+) -> None:
     """Compute and print similarity metrics for two samples.
 
     Args:
@@ -72,7 +91,9 @@ def match_samples_cmd(sample_a: str, sample_b: str, db: str) -> None:
 
     conn = open_db(db)
     try:
-        result = match_pair(conn, sample_a, sample_b)
+        result = match_pair(conn, sample_a, sample_b, algorithm=algorithm, plugin_file=plugin_file)
+    except PluginError as exc:
+        raise click.ClickException(str(exc)) from exc
     except KeyError as exc:
         raise click.ClickException(f"Sample not found in index: {exc.args[0]}") from exc
     finally:
@@ -101,7 +122,26 @@ def match_samples_cmd(sample_a: str, sample_b: str, db: str) -> None:
     help="Number of top matches to return.",
 )
 @click.option("--db", required=True, type=click.Path(exists=True), help="Path to SQLite database.")
-def match_sample_cmd(sample_id: str, against: str, top: int, db: str) -> None:
+@click.option(
+    "--algorithm",
+    default="identity",
+    show_default=True,
+    help="Matching plugin algorithm name.",
+)
+@click.option(
+    "--plugin-file",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Path to a local Python plugin file with create_plugin().",
+)
+def match_sample_cmd(
+    sample_id: str,
+    against: str,
+    top: int,
+    db: str,
+    algorithm: str,
+    plugin_file: str | None,
+) -> None:
     """Match one sample against all others and print ranked results.
 
     Args:
@@ -116,7 +156,15 @@ def match_sample_cmd(sample_id: str, against: str, top: int, db: str) -> None:
 
     conn = open_db(db)
     try:
-        results = match_against_all(conn, sample_id, top_n=top)
+        results = match_against_all(
+            conn,
+            sample_id,
+            top_n=top,
+            algorithm=algorithm,
+            plugin_file=plugin_file,
+        )
+    except PluginError as exc:
+        raise click.ClickException(str(exc)) from exc
     except KeyError as exc:
         raise click.ClickException(f"Sample not found in index: {exc.args[0]}") from exc
     finally:
@@ -140,7 +188,25 @@ def match_sample_cmd(sample_id: str, against: str, top: int, db: str) -> None:
 @click.argument("sample_a")
 @click.argument("sample_b")
 @click.option("--db", required=True, type=click.Path(exists=True), help="Path to SQLite database.")
-def shared_variants_cmd(sample_a: str, sample_b: str, db: str) -> None:
+@click.option(
+    "--algorithm",
+    default="identity",
+    show_default=True,
+    help="Matching plugin algorithm name.",
+)
+@click.option(
+    "--plugin-file",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Path to a local Python plugin file with create_plugin().",
+)
+def shared_variants_cmd(
+    sample_a: str,
+    sample_b: str,
+    db: str,
+    algorithm: str,
+    plugin_file: str | None,
+) -> None:
     """Print shared VRS IDs for two samples.
 
     Args:
@@ -154,7 +220,9 @@ def shared_variants_cmd(sample_a: str, sample_b: str, db: str) -> None:
 
     conn = open_db(db)
     try:
-        result = match_pair(conn, sample_a, sample_b)
+        result = match_pair(conn, sample_a, sample_b, algorithm=algorithm, plugin_file=plugin_file)
+    except PluginError as exc:
+        raise click.ClickException(str(exc)) from exc
     except KeyError as exc:
         raise click.ClickException(f"Sample not found in index: {exc.args[0]}") from exc
     finally:
@@ -162,3 +230,16 @@ def shared_variants_cmd(sample_a: str, sample_b: str, db: str) -> None:
 
     for vrs_id in sorted(result.shared_vrs_ids):
         click.echo(vrs_id)
+
+
+@cli.group("plugins")
+def plugins_cmd() -> None:
+    """Commands for inspecting discovered matcher plugins."""
+
+
+@plugins_cmd.command("list")
+def plugins_list_cmd() -> None:
+    """List available matcher plugin names."""
+
+    for name in list_plugins():
+        click.echo(name)

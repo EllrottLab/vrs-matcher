@@ -4,10 +4,12 @@ This module validates zygosity inference, genotype-to-VRS mapping, and sample
 loading behavior using mocked ``cyvcf2`` records.
 """
 
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+from vrs_matcher import loader as loader_mod
 from vrs_matcher.db import get_vrs_ids, open_db
-from vrs_matcher.loader import _zygosity, genotype_to_vrs_ids, load_samples
+from vrs_matcher.loader import _format_scalar, _zygosity, genotype_to_vrs_ids, load_samples
 from vrs_matcher.models import Zygosity
 
 
@@ -176,6 +178,20 @@ class TestGenotypeToVrsIds:
         """
 
         assert genotype_to_vrs_ids([], (1, 1)) == []
+
+
+class TestFormatScalar:
+    """Tests for FORMAT scalar extraction edge cases."""
+
+    def test_nan_returns_none(self):
+        """NaN FORMAT values should be treated as missing."""
+
+        assert _format_scalar([[float("nan")]], 0) is None
+
+    def test_missing_int_returns_none(self):
+        """cyvcf2 missing-int sentinels should be treated as missing."""
+
+        assert _format_scalar([[-2147483648]], 0) is None
 
 
 def test_load_samples_stores_rows(tmp_path):
@@ -362,3 +378,96 @@ def test_load_samples_parses_string_vrs_info(tmp_path):
         assert get_vrs_ids(conn, "S1") == frozenset({"ga4gh:VA.aaa", "ga4gh:VA.bbb"})
     finally:
         conn.close()
+
+
+def test_iter_rows_skips_filtered_missing_and_threshold_failures():
+    """Verify _iter_rows skips records for each filtering branch."""
+
+    class Record:
+        def __init__(self, *, flt=None, vrs=None, gt=None, gq=None, dp=None):
+            self.FILTER = flt
+            self._vrs = vrs
+            self.CHROM = "chr1"
+            self.POS = 100
+            self.genotypes = [gt or [0, 1, False]]
+            self._gq = gq
+            self._dp = dp
+
+        @property
+        def INFO(self):
+            return SimpleNamespace(get=lambda key: self._vrs)
+
+        def format(self, field):
+            if field == "GQ":
+                return self._gq
+            if field == "DP":
+                return self._dp
+            raise KeyError(field)
+
+    records = [
+        Record(flt="q10", vrs=["ga4gh:VA.filtered"]),
+        Record(vrs=None),
+        Record(vrs=[]),
+        Record(vrs=["ga4gh:VA.ref"], gt=[0, 0, False]),
+        Record(vrs=["ga4gh:VA.lowgq"], gq=[[10]]),
+        Record(vrs=["ga4gh:VA.lowdp"], gq=[[99]], dp=[[1]]),
+        Record(vrs=["ga4gh:VA.skip"], gt=[0, 1, False]),
+        Record(vrs=["ga4gh:VA.keep", "ga4gh:VA.keep"], gt=[1, 1, False], gq=[[99]], dp=[[9]]),
+    ]
+
+    mock_vcf = MagicMock()
+    mock_vcf.samples = ["S1"]
+    mock_vcf.__iter__ = MagicMock(return_value=iter(records))
+
+    with patch("cyvcf2.VCF", return_value=mock_vcf):
+        rows = list(
+            loader_mod._iter_rows(
+                "fake.vcf.gz",
+                gq_threshold=20,
+                dp_threshold=5,
+                candidate_vrs_ids={"ga4gh:VA.keep"},
+            )
+        )
+
+    assert rows == [("S1", "ga4gh:VA.keep", "1/1", "HOM_ALT", "chr1", 100, 99.0, 9, None)]
+
+
+def test_load_samples_flushes_batches_and_closes_connection(tmp_path, monkeypatch):
+    """Verify load_samples flushes large batches and closes the DB connection."""
+
+    rows = [
+        ("S1", f"ga4gh:VA.{i}", "0/1", "HET", "chr1", i, None, None, None) for i in range(10_001)
+    ]
+    insert_calls: list[int] = []
+
+    class DummyConn:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    dummy_conn = DummyConn()
+
+    monkeypatch.setattr(loader_mod, "open_db", lambda path: dummy_conn)
+    monkeypatch.setattr(loader_mod, "register_samples", lambda conn, sample_ids: None)
+    monkeypatch.setattr(
+        loader_mod, "insert_alleles", lambda conn, batch: insert_calls.append(len(batch))
+    )
+
+    header = MagicMock()
+    header.samples = ["S1"]
+    header.close = MagicMock()
+
+    mock_vcf = MagicMock()
+    mock_vcf.__iter__ = MagicMock(return_value=iter(()))
+
+    monkeypatch.setattr(loader_mod.cyvcf2, "VCF", MagicMock(side_effect=[header, mock_vcf]))
+    monkeypatch.setattr(loader_mod, "_iter_rows", lambda *args, **kwargs: iter(rows))
+
+    count = load_samples("fake.vcf.gz", tmp_path / "batch.db")
+
+    assert count == 10_001
+    assert insert_calls == [10_000, 1]
+    assert dummy_conn.closed is True
+    assert header.close.called is True

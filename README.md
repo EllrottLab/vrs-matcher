@@ -46,6 +46,33 @@ uv run ruff check .
 uv run ruff format .
 ```
 
+## Plugin algorithms
+
+`vrs-matcher` supports pluggable matching algorithms.
+
+- Use a built-in plugin such as `identity` when the default workflow is enough.
+- Use a local script plugin when you want to prototype a lab- or study-specific matcher.
+- Use an entry-point plugin when you want to distribute a reusable matcher as a Python package.
+
+Plugins change the **matching and ranking logic**, not the ingestion pipeline.
+Your VCFs are still loaded into the same SQLite-backed sample index; the plugin
+controls how indexed samples are compared after loading.
+
+```bash
+uv run vrs-matcher plugins list
+uv run vrs-matcher load-samples examples/example-cohort.vcf --db matches.db
+uv run vrs-matcher match-sample SAMPLE_A --db matches.db --algorithm identity
+uv run vrs-matcher match-sample SAMPLE_A --db matches.db --plugin-file examples/plugins/jaccard_floor_plugin.py
+```
+
+See `docs/plugins.md` for:
+
+- when to write a plugin,
+- a minimal copy-pasteable plugin template,
+- example bioinformatics plugin ideas such as rare-variant-weighted identity confirmation and candidate-gene-only sample matching,
+- how to test a plugin on known samples, and
+- how to package a plugin for reuse.
+
 ## Integration test (opt-in)
 
 The 1000 Genomes end-to-end test is marked `integration` and is skipped by
@@ -87,7 +114,9 @@ intra-super-population Jaccard is higher than inter-super-population Jaccard.
 ```text
 ./vrs-matcher
 ├── pyproject.toml   # project metadata + tool configuration
-├── src
-│   └── vrs_matcher  # package code
-└── tests            # test suite
+├── src/             # package code
+├── tests/           # test suite
+├── docs/            # usage guides (e.g. plugins.md)
+├── examples/        # runnable examples + sample data (see examples/README.md)
+└── scripts/         # helper / maintenance scripts
 ```

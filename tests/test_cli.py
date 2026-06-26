@@ -440,3 +440,67 @@ def test_match_sample_release_qc_top_hit(release_qc_db):
     data_lines = [line for line in result.output.splitlines() if line and not line.startswith("-")]
     assert len(data_lines) >= 2
     assert data_lines[1].startswith("REFERENCE_RELEASE_SAMPLE")
+
+
+def test_plugins_list_includes_identity():
+    """Verify plugin listing includes the built-in identity algorithm."""
+
+    result = CliRunner().invoke(cli, ["plugins", "list"])
+    assert result.exit_code == 0
+    assert "identity" in result.output
+
+
+def test_match_samples_with_script_plugin(test_db, tmp_path):
+    """Verify match-samples can load and execute a local script plugin."""
+
+    plugin_file = tmp_path / "cli_plugin.py"
+    plugin_file.write_text(
+        """
+from vrs_matcher.matcher import MatchResult
+from vrs_matcher.plugins import PLUGIN_API_VERSION
+
+
+class CliPlugin:
+    name = "cli-demo"
+    api_version = PLUGIN_API_VERSION
+
+    def match_pair(self, context, sample_a, sample_b, *, candidate_vrs_ids=None):
+        for sid in (sample_a, sample_b):
+            if not context.sample_exists(sid):
+                raise KeyError(sid)
+        return MatchResult(
+            sample_a=sample_a,
+            sample_b=sample_b,
+            jaccard=0.3333,
+            weighted_concordance=0.2222,
+            shared_vrs_ids=frozenset(),
+            total_a=0,
+            total_b=0,
+        )
+
+    def match_against_all(self, context, sample_id, *, top_n=None, candidate_vrs_ids=None):
+        return []
+
+
+def create_plugin():
+    return CliPlugin()
+""".strip(),
+        encoding="utf-8",
+    )
+
+    result = CliRunner().invoke(
+        cli,
+        [
+            "match-samples",
+            "S1",
+            "S2",
+            "--db",
+            test_db,
+            "--algorithm",
+            "cli-demo",
+            "--plugin-file",
+            str(plugin_file),
+        ],
+    )
+    assert result.exit_code == 0
+    assert "0.3333" in result.output
