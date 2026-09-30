@@ -28,6 +28,31 @@ CREATE TABLE IF NOT EXISTS sample_allele (
 );
 CREATE INDEX IF NOT EXISTS idx_vrs_id    ON sample_allele(vrs_id);
 CREATE INDEX IF NOT EXISTS idx_sample_id ON sample_allele(sample_id);
+CREATE TABLE IF NOT EXISTS genotype_panel (
+    singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+    panel_id TEXT NOT NULL,
+    metadata TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS genotype_marker (
+    vrs_id TEXT PRIMARY KEY,
+    sequence_id TEXT NOT NULL,
+    pos INTEGER NOT NULL CHECK (pos > 0),
+    ref TEXT NOT NULL,
+    alt TEXT NOT NULL,
+    UNIQUE(sequence_id, pos)
+);
+CREATE TABLE IF NOT EXISTS genotype_observation (
+    sample_id TEXT PRIMARY KEY REFERENCES samples(sample_id),
+    version INTEGER NOT NULL CHECK (version = 1),
+    provenance TEXT NOT NULL,
+    summary TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS genotype_call (
+    sample_id TEXT NOT NULL REFERENCES samples(sample_id),
+    vrs_id TEXT NOT NULL REFERENCES genotype_marker(vrs_id),
+    dosage INTEGER NOT NULL CHECK (dosage IN (0, 1, 2)),
+    PRIMARY KEY (sample_id, vrs_id)
+);
 """
 
 
@@ -44,12 +69,15 @@ def open_db(path: str | Path) -> sqlite3.Connection:
 
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     conn.executescript(_SCHEMA)
     conn.commit()
     return conn
 
 
-def register_samples(conn: sqlite3.Connection, sample_ids: Iterable[str]) -> None:
+def register_samples(
+    conn: sqlite3.Connection, sample_ids: Iterable[str], *, commit: bool = True
+) -> None:
     """Register sample IDs in the samples table.
 
     Idempotent: already-present IDs are silently ignored.  Call this with the
@@ -68,7 +96,8 @@ def register_samples(conn: sqlite3.Connection, sample_ids: Iterable[str]) -> Non
         "INSERT OR IGNORE INTO samples (sample_id) VALUES (?)",
         ((sid,) for sid in sample_ids),
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def sample_exists(conn: sqlite3.Connection, sample_id: str) -> bool:
@@ -89,7 +118,7 @@ def sample_exists(conn: sqlite3.Connection, sample_id: str) -> bool:
     return cur.fetchone() is not None
 
 
-def insert_alleles(conn: sqlite3.Connection, rows: Iterable[tuple]) -> None:
+def insert_alleles(conn: sqlite3.Connection, rows: Iterable[tuple], *, commit: bool = True) -> None:
     """Insert or replace allele rows into the index.
 
     Also registers the sample IDs found in ``rows`` so that callers which
@@ -107,7 +136,11 @@ def insert_alleles(conn: sqlite3.Connection, rows: Iterable[tuple]) -> None:
     """
 
     rows_list = list(rows)
-    register_samples(conn, dict.fromkeys(row[0] for row in rows_list))
+    sample_ids = set(row[0] for row in rows_list)
+    protected = {r[0] for r in conn.execute("SELECT sample_id FROM genotype_observation")}
+    if sample_ids & protected:
+        raise ValueError("Cannot overwrite genotype-indexed observations; rebuild the index.")
+    register_samples(conn, sample_ids, commit=False)
     conn.executemany(
         """
         INSERT OR REPLACE INTO sample_allele
@@ -116,7 +149,8 @@ def insert_alleles(conn: sqlite3.Connection, rows: Iterable[tuple]) -> None:
         """,
         rows_list,
     )
-    conn.commit()
+    if commit:
+        conn.commit()
 
 
 def get_vrs_ids(conn: sqlite3.Connection, sample_id: str) -> frozenset[str]:

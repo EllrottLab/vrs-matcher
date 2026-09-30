@@ -9,6 +9,7 @@ This module supports three plugin sources:
 
 from __future__ import annotations
 
+import json
 from importlib import metadata, util
 from pathlib import Path
 from types import ModuleType
@@ -18,7 +19,7 @@ from .db import get_genotype_states, get_vrs_ids, list_samples, sample_exists
 
 if TYPE_CHECKING:
     from .matcher import MatchResult
-    from .models import GenotypeState
+    from .models import GenotypeState, KinshipMatches, KinshipResult
 
 ENTRYPOINT_GROUP = "vrs_matcher.plugins"
 PLUGIN_API_VERSION = "1"
@@ -54,6 +55,76 @@ class PluginContext:
 
         return list_samples(self.conn)
 
+    def get_genotype_panel(self) -> dict:
+        """Return completed panel metadata; old allele indexes are not sufficient."""
+        row = self.conn.execute("SELECT metadata FROM genotype_panel").fetchone()
+        if row is None:
+            raise PluginError("KING requires re-ingestion with --index-genotypes --panel.")
+        return json.loads(row[0])
+
+    def get_panel_ids(self) -> frozenset[str]:
+        return frozenset(r[0] for r in self.conn.execute("SELECT vrs_id FROM genotype_marker"))
+
+    def get_called_genotypes(self, sample_id: str) -> dict[str, int]:
+        """Return explicit calls, including reference dosage zero; absence is unknown."""
+        if not self.sample_exists(sample_id):
+            raise KeyError(sample_id)
+        row = self.conn.execute(
+            "SELECT version FROM genotype_observation WHERE sample_id = ?", (sample_id,)
+        ).fetchone()
+        if row is None or row[0] != 1:
+            raise PluginError(
+                f"KING requires re-ingestion of {sample_id!r} with --index-genotypes --panel "
+                "into a rebuilt index."
+            )
+        return dict(
+            self.conn.execute(
+                "SELECT vrs_id, dosage FROM genotype_call WHERE sample_id = ?", (sample_id,)
+            )
+        )
+
+    def get_called_genotypes_many(
+        self, sample_ids: list[str], *, batch_size: int = 500
+    ) -> dict[str, dict[str, int]]:
+        """Fetch explicit calls for many indexed observations in batched SQL queries."""
+        if batch_size < 1:
+            raise ValueError("batch_size must be positive.")
+        unique_ids = list(dict.fromkeys(sample_ids))
+        result = {sample_id: {} for sample_id in unique_ids}
+        for start in range(0, len(unique_ids), batch_size):
+            batch = unique_ids[start : start + batch_size]
+            placeholders = ",".join("?" for _ in batch)
+            rows = self.conn.execute(
+                f"""
+                SELECT s.sample_id, o.version
+                FROM samples AS s
+                LEFT JOIN genotype_observation AS o USING (sample_id)
+                WHERE s.sample_id IN ({placeholders})
+                """,
+                batch,
+            )
+            statuses = {row["sample_id"]: row["version"] for row in rows}
+            missing = [sample_id for sample_id in batch if sample_id not in statuses]
+            if missing:
+                raise KeyError(missing[0])
+            unindexed = [sample_id for sample_id in batch if statuses[sample_id] != 1]
+            if unindexed:
+                raise PluginError(
+                    f"KING requires re-ingestion of {unindexed[0]!r} with "
+                    "--index-genotypes --panel into a rebuilt index."
+                )
+            calls = self.conn.execute(
+                f"""
+                SELECT sample_id, vrs_id, dosage
+                FROM genotype_call
+                WHERE sample_id IN ({placeholders})
+                """,
+                batch,
+            )
+            for row in calls:
+                result[row["sample_id"]][row["vrs_id"]] = row["dosage"]
+        return result
+
 
 class MatcherPlugin(Protocol):
     """Structural contract for sample-matching plugins."""
@@ -68,7 +139,7 @@ class MatcherPlugin(Protocol):
         sample_b: str,
         *,
         candidate_vrs_ids: frozenset[str] | None = None,
-    ) -> MatchResult: ...
+    ) -> MatchResult | KinshipResult: ...
 
     def match_against_all(
         self,
@@ -77,7 +148,7 @@ class MatcherPlugin(Protocol):
         *,
         top_n: int | None = None,
         candidate_vrs_ids: frozenset[str] | None = None,
-    ) -> list[MatchResult]: ...
+    ) -> list[MatchResult] | KinshipMatches: ...
 
 
 _BUILTIN_PLUGINS: dict[str, MatcherPlugin] = {}

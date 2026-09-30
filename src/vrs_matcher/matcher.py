@@ -7,7 +7,8 @@ set overlap and genotype concordance.
 from dataclasses import dataclass
 from enum import StrEnum
 
-from .models import GenotypeState, Zygosity
+from .king import KingRobustPlugin
+from .models import GenotypeState, KinshipMatches, KinshipResult, Zygosity
 from .plugins import (
     PLUGIN_API_VERSION,
     PluginContext,
@@ -130,7 +131,7 @@ def match_pair(
     candidate_vrs_ids: frozenset[str] | None = None,
     algorithm: str = MatchMode.IDENTITY,
     plugin_file: str | None = None,
-) -> MatchResult:
+) -> MatchResult | KinshipResult:
     """Compute pairwise similarity between two samples.
 
     Args:
@@ -170,7 +171,7 @@ def match_against_all(
     candidate_vrs_ids: frozenset[str] | None = None,
     algorithm: str = MatchMode.IDENTITY,
     plugin_file: str | None = None,
-) -> list[MatchResult]:
+) -> list[MatchResult] | KinshipMatches:
     """Match one sample against all other indexed samples.
 
     Args:
@@ -276,3 +277,4 @@ class IdentityMatcherPlugin:
 
 
 register_builtin(IdentityMatcherPlugin(), replace=True)
+register_builtin(KingRobustPlugin(), replace=True)

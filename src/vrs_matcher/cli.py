@@ -4,11 +4,15 @@ The commands in this module provide operational access to the ingestion and
 matching layers.
 """
 
+import json
+from dataclasses import asdict
+
 import click
 
 from .db import open_db
 from .loader import DEFAULT_DP_THRESHOLD, DEFAULT_GQ_THRESHOLD, load_samples
 from .matcher import match_against_all, match_pair
+from .models import KinshipMatches, KinshipResult
 from .plugins import PluginError, list_plugins
 
 
@@ -37,7 +41,23 @@ def cli() -> None:
     show_default=True,
     help="Minimum read depth (DP) to include.",
 )
-def load_samples_cmd(vcf: str, db: str, source_dataset: str, gq: float, dp: int) -> None:
+@click.option(
+    "--index-genotypes", is_flag=True, help="Atomically index called SNP genotypes for KING."
+)
+@click.option(
+    "--panel",
+    type=click.Path(exists=True, dir_okay=False),
+    help="Declared KING panel TSV; requires --index-genotypes.",
+)
+def load_samples_cmd(
+    vcf: str,
+    db: str,
+    source_dataset: str,
+    gq: float,
+    dp: int,
+    index_genotypes: bool,
+    panel: str | None,
+) -> None:
     """Load a VRS-annotated VCF into the sample-allele index.
 
     Args:
@@ -51,7 +71,21 @@ def load_samples_cmd(vcf: str, db: str, source_dataset: str, gq: float, dp: int)
         None.
     """
 
-    n = load_samples(vcf, db, source_dataset=source_dataset, gq_threshold=gq, dp_threshold=dp)
+    try:
+        n = load_samples(
+            vcf,
+            db,
+            source_dataset=source_dataset,
+            gq_threshold=gq,
+            dp_threshold=dp,
+            index_genotypes=index_genotypes,
+            panel=panel,
+        )
+    except (ValueError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    if isinstance(n, dict):
+        click.echo(json.dumps(n, sort_keys=True, allow_nan=False))
+        return
     click.echo(f"Loaded {n} allele records into {db}")
 
 
@@ -71,12 +105,16 @@ def load_samples_cmd(vcf: str, db: str, source_dataset: str, gq: float, dp: int)
     default=None,
     help="Path to a local Python plugin file with create_plugin().",
 )
+@click.option(
+    "--json", "json_output", is_flag=True, help="Full-precision machine-readable results."
+)
 def match_samples_cmd(
     sample_a: str,
     sample_b: str,
     db: str,
     algorithm: str,
     plugin_file: str | None,
+    json_output: bool,
 ) -> None:
     """Compute and print similarity metrics for two samples.
 
@@ -99,6 +137,13 @@ def match_samples_cmd(
     finally:
         conn.close()
 
+    if json_output:
+        click.echo(json.dumps(asdict(result), default=sorted, allow_nan=False))
+        return
+    if isinstance(result, KinshipResult):
+        for key, value in asdict(result).items():
+            click.echo(f"{key}: {value if value is not None else 'NA'}")
+        return
     click.echo(f"Jaccard:              {result.jaccard:.4f}")
     click.echo(f"Weighted concordance: {result.weighted_concordance:.4f}")
     click.echo(f"Shared variants:      {len(result.shared_vrs_ids)}")
@@ -134,6 +179,9 @@ def match_samples_cmd(
     default=None,
     help="Path to a local Python plugin file with create_plugin().",
 )
+@click.option(
+    "--json", "json_output", is_flag=True, help="Full-precision machine-readable results."
+)
 def match_sample_cmd(
     sample_id: str,
     against: str,
@@ -141,6 +189,7 @@ def match_sample_cmd(
     db: str,
     algorithm: str,
     plugin_file: str | None,
+    json_output: bool,
 ) -> None:
     """Match one sample against all others and print ranked results.
 
@@ -170,6 +219,24 @@ def match_sample_cmd(
     finally:
         conn.close()
 
+    if json_output:
+        data = (
+            asdict(results) if isinstance(results, KinshipMatches) else [asdict(r) for r in results]
+        )
+        click.echo(json.dumps(data, default=sorted, allow_nan=False))
+        return
+    if isinstance(results, KinshipMatches):
+        click.echo("Sample\tKinship\tWithin-family\tM\tH_i\tH_j\tHH\tO\tIBS0")
+        for r in results.matches:
+            click.echo(
+                f"{r.sample_b}\t{r.kinship}\t{r.kinship_within_family}\t{r.n_common}"
+                f"\t{r.het_a}\t{r.het_b}\t{r.het_both}\t{r.opposite_hom}\t{r.ibs0_fraction}"
+            )
+        if results.unscorable:
+            click.echo("Unscorable (outside top-N):")
+            for r in results.unscorable:
+                click.echo(f"{r.sample_b}\t{r.reason}\tM={r.n_common}")
+        return
     if not results:
         click.echo("No other samples found in index.")
         return
@@ -228,6 +295,10 @@ def shared_variants_cmd(
     finally:
         conn.close()
 
+    if isinstance(result, KinshipResult):
+        raise click.ClickException(
+            "shared-variants requires an allele-matching algorithm, not KING."
+        )
     for vrs_id in sorted(result.shared_vrs_ids):
         click.echo(vrs_id)
 

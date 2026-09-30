@@ -53,3 +53,33 @@ class SampleGenotype:
 
     sample_id: str
     alleles: dict[str, GenotypeState] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class KinshipResult:
+    """KING equations 11 and 9 on jointly called markers; not identity scores."""
+
+    sample_a: str
+    sample_b: str
+    panel_id: str
+    n_common: int
+    het_a: int
+    het_b: int
+    het_both: int
+    opposite_hom: int
+    kinship: float | None
+    kinship_within_family: float | None
+    ibs0_fraction: float | None
+    status: str
+    reason: str | None
+    within_family_reason: str | None
+    estimator: str = "KING-between-family-eq11"
+    estimator_version: str = "1"
+
+
+@dataclass
+class KinshipMatches:
+    """Scored top-N results and all unscorable peers, kept separate."""
+
+    matches: list[KinshipResult]
+    unscorable: list[KinshipResult]
