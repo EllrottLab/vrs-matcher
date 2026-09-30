@@ -54,6 +54,7 @@ def validate_prepared_input(args):
     _, markers, aliases = read_panel(args.panel)
     vcf = cyvcf2.VCF(str(args.vcf))
     seen = set()
+    sample_count = len(vcf.samples)
     try:
         if len(vcf.samples) < 2:
             raise ValueError("Benchmark requires at least two observations.")
@@ -92,6 +93,79 @@ def validate_prepared_input(args):
             raise ValueError("Benchmark VCF has no panel records.")
     finally:
         vcf.close()
+    return {"samples": sample_count, "markers": len(seen)}
+
+
+def generate_synthetic_inputs(vcf_path, panel_path, *, samples, markers, seed):
+    """Write reproducible synthetic diploid calls and a matching panel."""
+    if samples < 2 or markers < 1:
+        raise ValueError("Synthetic benchmark needs at least two samples and one marker.")
+    rng = random.Random(seed)
+    sample_ids = [f"S{i:05d}" for i in range(samples)]
+    with panel_path.open("w") as panel, vcf_path.open("w") as vcf:
+        panel.write("reference\tannotation_version\tchrom\tsequence_id\tpos\tref\talt\tvrs_id\n")
+        vcf.write(
+            "##fileformat=VCFv4.2\n"
+            "##reference=synthetic-benchmark-reference\n"
+            "##vrs_annotation=synthetic-benchmark-1\n"
+            f"##contig=<ID=chr1,length={markers + 1},"
+            "refget=ga4gh:SQ.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA>\n"
+            "##INFO=<ID=VRS_Allele_IDs,Number=A,Type=String,"
+            'Description="Synthetic benchmark marker">\n'
+            '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+            '##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">\n'
+            '##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Depth">\n'
+            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" + "\t".join(sample_ids) + "\n"
+        )
+        for marker in range(1, markers + 1):
+            vrs_id = f"ga4gh:VA.{marker:032d}"
+            panel.write(
+                f"synthetic-benchmark-reference\tsynthetic-benchmark-1\t1\t"
+                f"ga4gh:SQ.{'A' * 32}\t{marker}\tA\tC\t{vrs_id}\n"
+            )
+            genotypes = (("0/0", "0/1", "1/1")[rng.randrange(3)] for _ in sample_ids)
+            vcf.write(
+                f"chr1\t{marker}\t.\tA\tC\t.\tPASS\tVRS_Allele_IDs={vrs_id}\tGT:GQ:DP\t"
+                + "\t".join(f"{gt}:30:20" for gt in genotypes)
+                + "\n"
+            )
+
+
+def profile_indexed_pairs(context):
+    """Time tiled SQLite retrieval separately from scoring/iteration."""
+    from vrs_matcher.king import KingRobustPlugin
+
+    class RetrievalTimer:
+        def __init__(self, wrapped):
+            self.wrapped = wrapped
+            self.retrieval_seconds = 0.0
+
+        def get_called_genotypes_many(self, *args, **kwargs):
+            start = time.perf_counter()
+            try:
+                return self.wrapped.get_called_genotypes_many(*args, **kwargs)
+            finally:
+                self.retrieval_seconds += time.perf_counter() - start
+
+        def __getattr__(self, name):
+            return getattr(self.wrapped, name)
+
+    timed_context = RetrievalTimer(context)
+    start = time.perf_counter()
+    pairs = scorable = checksum = 0
+    for result in KingRobustPlugin().iter_all_pairs(timed_context):
+        pairs += 1
+        scorable += result.kinship is not None
+        checksum += result.n_common + result.het_a + result.het_b + result.opposite_hom
+    total_seconds = time.perf_counter() - start
+    return {
+        "retrieval_seconds": timed_context.retrieval_seconds,
+        "scoring_iteration_seconds": max(0.0, total_seconds - timed_context.retrieval_seconds),
+        "profile_seconds": total_seconds,
+        "pairs": pairs,
+        "scorable_pairs": scorable,
+        "checksum": checksum,
+    }
 
 
 def worker(args):
@@ -102,19 +176,22 @@ def worker(args):
     from vrs_matcher.plugins import PluginContext
 
     if args.stage in ("load", "identity-load"):
+        start = time.perf_counter()
         result = load_samples(
             args.vcf,
             args.db,
             index_genotypes=args.stage == "load",
             panel=args.panel if args.stage == "load" else None,
         )
-        print(json.dumps(result))
+        print(json.dumps({"index_build_seconds": time.perf_counter() - start, "summary": result}))
         return
     conn = open_db(args.db)
     try:
         samples = list_samples(conn)
         if args.stage == "query":
             print(json.dumps(asdict(match_against_all(conn, samples[0], algorithm="king-robust"))))
+        elif args.stage == "profile":
+            print(json.dumps(profile_indexed_pairs(PluginContext(conn))))
         else:
             pair_results = KingRobustPlugin().iter_all_pairs(PluginContext(conn))
             write_tsv(args.output / "pairs.tsv", (asdict(row) for row in pair_results))
@@ -321,10 +398,8 @@ def summarize_labels(args, scores):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--vcf", type=Path, required=True, help="Prefiltered, VRS-annotated VCF(.gz)."
-    )
-    parser.add_argument("--panel", type=Path, required=True)
+    parser.add_argument("--vcf", type=Path, help="Prefiltered, VRS-annotated VCF(.gz).")
+    parser.add_argument("--panel", type=Path)
     parser.add_argument("--output", type=Path, required=True, help="New output directory.")
     parser.add_argument("--vcftools", default="vcftools")
     parser.add_argument("--samples", type=Path, help="sample/donor/family/ancestry TSV")
@@ -336,7 +411,20 @@ def main():
         "--repeats", type=int, default=6, help="First run plus five repeats by default."
     )
     parser.add_argument(
-        "--stage", choices=["load", "identity-load", "query", "all"], help=argparse.SUPPRESS
+        "--synthetic-samples",
+        type=int,
+        help="Generate deterministic synthetic input with this many observations.",
+    )
+    parser.add_argument(
+        "--synthetic-markers",
+        type=int,
+        help="Generate deterministic synthetic input with this many SNP markers.",
+    )
+    parser.add_argument("--seed", type=int, default=0, help="Seed for synthetic input generation.")
+    parser.add_argument(
+        "--stage",
+        choices=["load", "identity-load", "query", "all", "profile"],
+        help=argparse.SUPPRESS,
     )
     parser.add_argument("--db", type=Path, help=argparse.SUPPRESS)
     args = parser.parse_args()
@@ -347,11 +435,40 @@ def main():
         parser.error("--repeats must be positive")
     if not args.smoke and (not args.samples or not args.relationships):
         parser.error("Supply biological labels or explicitly select --smoke")
+    synthetic_requested = args.synthetic_samples is not None or args.synthetic_markers is not None
+    if synthetic_requested:
+        if args.synthetic_samples is None or args.synthetic_markers is None:
+            parser.error("Specify both --synthetic-samples and --synthetic-markers.")
+        if args.vcf is not None or args.panel is not None:
+            parser.error("Do not combine synthetic dimensions with --vcf or --panel.")
+        if args.synthetic_samples < 2 or args.synthetic_markers < 1:
+            parser.error("Synthetic input needs at least two samples and one marker.")
+    elif args.vcf is None or args.panel is None:
+        parser.error("Supply both --vcf and --panel, or use both synthetic dimensions.")
     executable = shutil.which(args.vcftools)
     if not executable:
         parser.error("VCFtools executable not found")
-    validate_prepared_input(args)
     args.output.mkdir(parents=True, exist_ok=False)
+    synthetic_config = None
+    if synthetic_requested:
+        args.vcf = args.output / "synthetic.vcf"
+        args.panel = args.output / "synthetic-panel.tsv"
+        try:
+            generate_synthetic_inputs(
+                args.vcf,
+                args.panel,
+                samples=args.synthetic_samples,
+                markers=args.synthetic_markers,
+                seed=args.seed,
+            )
+        except ValueError as exc:
+            parser.error(str(exc))
+        synthetic_config = {
+            "samples": args.synthetic_samples,
+            "markers": args.synthetic_markers,
+            "seed": args.seed,
+        }
+    dimensions = validate_prepared_input(args)
     root = Path(__file__).resolve().parents[1]
     manifest = {
         "command": sys.argv,
@@ -362,6 +479,8 @@ def main():
         "sqlite": sqlite3.sqlite_version,
         "python": sys.version,
         "mode": "smoke" if args.smoke else "labeled",
+        "cohort": dimensions,
+        "synthetic_input": synthetic_config,
         "cache": "uncontrolled OS cache; fresh processes; first run reported separately",
         "sha": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=root, text=True).strip(),
         "dirty": subprocess.check_output(["git", "status", "--short"], cwd=root, text=True),
@@ -407,11 +526,41 @@ def main():
             "--out",
             str(args.output / f"vcftools-{repeat}"),
         ]
-        stages = [("load", command("load")), ("query", command("query")), ("all", command("all"))]
+        stages = [
+            ("load", command("load")),
+            ("profile", command("profile")),
+            ("query", command("query")),
+            ("all", command("all")),
+        ]
         stages.insert(len(stages) if repeat % 2 else 0, ("vcftools", baseline))
         for stage, cmd in stages:
             metrics = measure(cmd, args.output / f"{repeat}-{stage}.log")
-            timings.append({"repeat": repeat, "stage": stage, **metrics})
+            row = {
+                "repeat": repeat,
+                "stage": stage,
+                **metrics,
+                "index_build_seconds": "",
+                "retrieval_seconds": "",
+                "scoring_iteration_seconds": "",
+                "profile_seconds": "",
+                "samples": dimensions["samples"],
+                "markers": dimensions["markers"],
+                "pairs": "",
+            }
+            if stage == "load":
+                load_result = json.loads((args.output / f"{repeat}-{stage}.log").read_text())
+                row["index_build_seconds"] = load_result["index_build_seconds"]
+            elif stage == "profile":
+                phases = json.loads((args.output / f"{repeat}-{stage}.log").read_text())
+                if phases["pairs"] != dimensions["samples"] * (dimensions["samples"] - 1) // 2:
+                    raise RuntimeError("Profiled pair count does not match cohort dimensions.")
+                row.update(
+                    retrieval_seconds=phases["retrieval_seconds"],
+                    scoring_iteration_seconds=phases["scoring_iteration_seconds"],
+                    profile_seconds=phases["profile_seconds"],
+                    pairs=phases["pairs"],
+                )
+            timings.append(row)
             write_tsv(args.output / "timings.tsv", timings)
             if metrics["exit_code"]:
                 raise RuntimeError(f"{stage} failed; see {repeat}-{stage}.log and timings.tsv")
@@ -461,7 +610,8 @@ def main():
     report = [
         "# KING benchmark report",
         "",
-        f"Mode: {manifest['mode']}. Unique pairs: {len(scores)}.",
+        f"Mode: {manifest['mode']}. Cohort: {dimensions['samples']} observations, "
+        f"{dimensions['markers']} markers, {len(scores)} unique pairs.",
         "",
         "Input preparation and VRS annotation are excluded; this is not end-to-end timing.",
         "VCFtools computes both pair directions and diagonals; the plugin all-pairs stage",
@@ -487,6 +637,34 @@ def main():
         report.append(
             f"| {stage} | {rows[0]['wall_seconds']:.6f} | {median} | "
             f"{spread} | {max(r['peak_rss_bytes'] for r in rows) / (1024**2):.2f} |"
+        )
+    report += [
+        "",
+        "## Isolated index, retrieval, and scoring phases",
+        "",
+        "These phase durations are measured inside the worker, excluding subprocess "
+        "startup. `index build` times input parsing and database creation. `call "
+        "retrieval` times SQLite reads into tiled genotype maps; `scoring + iteration` "
+        "covers pair enumeration, score calculation, and result construction but "
+        "excludes those retrieval calls. Process peak RSS is reported for the worker "
+        "that measured each phase.",
+        "",
+        "| Phase | First run (s) | Subsequent median (s) | Subsequent range (s) | "
+        "Max worker peak RSS (MiB) |",
+        "|---|---:|---:|---|---:|",
+    ]
+    for label, stage, key in [
+        ("Index build", "load", "index_build_seconds"),
+        ("Call retrieval", "profile", "retrieval_seconds"),
+        ("Scoring + pair iteration", "profile", "scoring_iteration_seconds"),
+    ]:
+        rows = [r for r in timings if r["stage"] == stage]
+        values = [float(r[key]) for r in rows[1:]]
+        median = f"{statistics.median(values):.6f}" if values else "NA"
+        spread = f"{min(values):.6f}–{max(values):.6f}" if values else "NA"
+        report.append(
+            f"| {label} | {float(rows[0][key]):.6f} | {median} | {spread} | "
+            f"{max(r['peak_rss_bytes'] for r in rows) / (1024**2):.2f} |"
         )
     workloads = summarize_workloads(timings)
     report += ["", "## Workload comparisons", ""]

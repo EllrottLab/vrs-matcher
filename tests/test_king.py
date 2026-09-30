@@ -491,3 +491,38 @@ def test_benchmark_workload_summaries_use_matched_repeats():
     first_summary = benchmark.summarize_workloads(first_only)
     assert first_summary["index_plus_all_pairs"]["basis"] == "first run only"
     assert first_summary["indexed_all_pairs"]["plugin_median_seconds"] == 30
+
+
+def test_synthetic_benchmark_data_and_phase_instrumentation(tmp_path):
+    import importlib.util
+    from argparse import Namespace
+
+    from vrs_matcher.db import open_db
+
+    spec = importlib.util.spec_from_file_location(
+        "benchmark_king", Path("scripts/benchmark_king.py")
+    )
+    benchmark = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(benchmark)
+    first_vcf, first_panel = tmp_path / "first.vcf", tmp_path / "first-panel.tsv"
+    second_vcf, second_panel = tmp_path / "second.vcf", tmp_path / "second-panel.tsv"
+    for vcf, panel in ((first_vcf, first_panel), (second_vcf, second_panel)):
+        benchmark.generate_synthetic_inputs(vcf, panel, samples=6, markers=16, seed=41)
+    assert first_vcf.read_bytes() == second_vcf.read_bytes()
+    assert first_panel.read_bytes() == second_panel.read_bytes()
+    args = Namespace(vcf=first_vcf, panel=first_panel)
+    assert benchmark.validate_prepared_input(args) == {"samples": 6, "markers": 16}
+
+    db = tmp_path / "synthetic.db"
+    load_samples(first_vcf, db, index_genotypes=True, panel=first_panel)
+    conn = open_db(db)
+    phases = benchmark.profile_indexed_pairs(PluginContext(conn))
+    conn.close()
+    assert phases["pairs"] == 15
+    assert phases["scorable_pairs"] == 15
+    assert phases["checksum"] > 0
+    assert phases["retrieval_seconds"] >= 0
+    assert phases["scoring_iteration_seconds"] >= 0
+    assert phases["profile_seconds"] >= (
+        phases["retrieval_seconds"] + phases["scoring_iteration_seconds"]
+    )

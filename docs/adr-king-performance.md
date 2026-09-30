@@ -5,8 +5,10 @@
 Accepted · 2026-09-30. The benchmark reports index construction, one-versus-all
 query, indexed all-pairs matching, and direct VCFtools execution as distinct
 workloads. Batched genotype retrieval, pair-result streaming, and bounded top-N
-selection are implemented. Packed genotype representations and native or
-parallel scoring remain conditional follow-up work.
+selection are implemented. A deterministic synthetic benchmark mode now reports
+index construction, SQLite call retrieval, and scoring/iteration separately.
+Packed genotype representations and native or parallel scoring remain
+conditional follow-up work.
 
 ## Context
 
@@ -68,13 +70,19 @@ and result contract. Before changing representations:
    of tile size and for the cost of rereading calls across sample tiles. The
    default tile size bounds transient genotype maps, but all unscorable results
    are still retained in memory to preserve current behavior.
-4. Only if profiles still show Python dictionary/set traversal as a material
+4. **Implemented instrumentation:** `scripts/benchmark_king.py` can generate
+   deterministic synthetic cohorts (`--synthetic-samples`, `--synthetic-markers`,
+   `--seed`) and records internal index-build, tiled retrieval, and scoring plus
+   pair-iteration durations separately. It also records sample/marker/pair
+   counts and input hashes. Profiling retrieval and scoring uses the same
+   bounded tiled iterator as the production all-pairs path.
+5. Only if profiles still show Python dictionary/set traversal as a material
    cost, prototype packed dosage arrays or per-dosage bitsets for the called
    genotype matrix. Keep the SQLite tables as the canonical persisted format
    initially; build and cache the compact representation at query time or in an
    explicitly versioned derived index. Validate all counts and kinship values
    against the existing implementation before considering a storage migration.
-5. Consider native/vectorized scoring or parallel execution only after the
+6. Consider native/vectorized scoring or parallel execution only after the
    batch and representation experiments identify the remaining bottleneck.
 
 ## Consequences
@@ -107,6 +115,21 @@ Compare exact counts and results against the current scorer, including missing
 calls, candidate restrictions, unscorable pairs, ties, and top-N ordering.
 Retain a compact smoke benchmark for report generation only; do not use it as
 evidence of a cohort-scale speedup.
+
+The synthetic mode isolates cost centers but does not model real ancestry,
+missingness, annotation, or VRS identifier derivation. Use it to compare
+implementation revisions on identical generated inputs, then validate scaling
+on representative prepared data before making biological-workload performance
+claims.
+
+Initial phase-instrumentation run: deterministic synthetic cohort, 128
+observations × 512 markers, seed 0, Python 3.13.5, three total runs (one first
+run plus two subsequent runs). The subsequent medians were 0.639 s for index
+construction, 0.111 s for tiled call retrieval, and 0.766 s for scoring plus
+pair iteration over 8,128 unique pairs. The profile worker's total was about
+0.877 s median, excluding startup. This is a repeatability and instrumentation
+check, not a biological throughput result; the limited repeat count and
+uncontrolled OS cache should be considered when interpreting it.
 
 ## Alternatives considered
 

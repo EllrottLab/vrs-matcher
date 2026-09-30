@@ -157,6 +157,22 @@ uv run python scripts/benchmark_king.py \
   --vcftools /path/to/vcftools --output /tmp/king-smoke --smoke
 ```
 
+For a larger repeatable performance run without biological claims, have the
+runner generate a deterministic synthetic cohort. This example uses 128
+observations, 512 markers, three runs, and a fixed random seed:
+
+```bash
+uv run python scripts/benchmark_king.py \
+  --synthetic-samples 128 --synthetic-markers 512 --seed 0 \
+  --repeats 3 --vcftools /path/to/vcftools \
+  --output /tmp/king-synthetic-128x512 --smoke
+```
+
+The generated VCF and panel are retained in the output directory. The report
+separates database index construction, tiled SQLite call retrieval, and
+in-memory pair scoring/iteration. It records dimensions and hashes so runs can
+be reproduced; increase samples and markers independently to study scaling.
+
 The output directory must not exist. Inputs must already be restricted to panel
 markers and QC-masked; low GQ/DP calls and failed records are rejected rather
 than giving VCFtools a different input. Complete diploid calls or `./.` are
