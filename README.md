@@ -28,13 +28,15 @@ uv run vrs-matcher
 
 - [Sample identity confirmation with your own VCFs](docs/how-to-sample-identity-confirmation.md)
 - [Cohort deduplication and data release QC with your own VCFs](docs/how-to-cohort-dedup-qc.md)
+- [KING-robust kinship estimation](docs/how-to-king-robust.md) — opt-in indexing of
+  called reference and alternate SNP genotypes, pairwise estimates, and cohort ranking.
 
 ## Development
 
 ### Requirements
 
 - [uv](https://docs.astral.sh/uv/)
-- [Python 3.12+](https://www.python.org/downloads/)
+- [Python 3.13+](https://www.python.org/downloads/)
 
 ### Tests
 
@@ -51,6 +53,8 @@ uv run ruff format .
 `vrs-matcher` supports pluggable matching algorithms.
 
 - Use a built-in plugin such as `identity` when the default workflow is enough.
+- Use `king-robust` for kinship estimates after loading with
+  `--index-genotypes --panel PANEL.tsv`; allele-only indexes require re-ingestion.
 - Use a local script plugin when you want to prototype a lab- or study-specific matcher.
 - Use an entry-point plugin when you want to distribute a reusable matcher as a Python package.
 
@@ -73,21 +77,57 @@ See `docs/plugins.md` for:
 - how to test a plugin on known samples, and
 - how to package a plugin for reuse.
 
-## Integration test (opt-in)
+## Integration tests (opt-in)
 
-The 1000 Genomes end-to-end test is marked `integration` and is skipped by
-default. It requires a local [seqrepo](https://github.com/biocommons/biocommons.seqrepo)
-data instance (one-time download, ~10 GB) and internet access for the 1KGP VCF.
+Integration tests are marked `integration` and are skipped by default. Install
+the integration dependencies before running them:
 
 ```bash
-# install only what the integration test needs
 uv sync --group dev --group integration
+```
 
-# one-time seqrepo download (skip if already present)
-scripts/setup_integration_data.sh
+Available integration tests:
 
-# run just integration tests
-export GA4GH_VRS_DATAPROXY_URI=seqrepo+file://$HOME/.local/share/seqrepo/2024-12-20
+- **1000 Genomes population signal** (`tests/integration/test_1kg_cluster.py`):
+  downloads a chr22 VCF slice and annotates it with VRS IDs. It requires
+  internet access and a local
+  [seqrepo](https://github.com/biocommons/biocommons.seqrepo) data instance
+  (one-time download, ~10 GB):
+
+  ```bash
+  # one-time seqrepo download (skip if already present)
+  scripts/setup_integration_data.sh
+
+  export GA4GH_VRS_DATAPROXY_URI=seqrepo+file://$HOME/.local/share/seqrepo/2024-12-20
+  uv run pytest tests/integration/test_1kg_cluster.py --run-integration
+  ```
+
+- **KING/VCFtools comparison** (`tests/integration/test_king_vcftools.py`):
+  compares KING-robust output with VCFtools `--relatedness2` using the small
+  synthetic fixture in `tests/data/king/`. Install VCFtools 0.1.16 or newer
+  using your system package manager:
+
+  ```bash
+  # macOS (Homebrew)
+  brew install vcftools
+
+  # Ubuntu/Debian
+  sudo apt-get update
+  sudo apt-get install vcftools
+  ```
+
+  Confirm the installed version with `vcftools --version`. If the executable
+  is not on `PATH`, set `VCFTOOLS` to its path:
+
+  ```bash
+  VCFTOOLS=/opt/homebrew/bin/vcftools uv run pytest \
+    tests/integration/test_king_vcftools.py --run-integration
+  ```
+
+To run every integration test, configure seqrepo as above and make VCFtools
+available, then run:
+
+```bash
 RUN_INTEGRATION_TESTS=1 uv run pytest -m integration --run-integration
 ```
 

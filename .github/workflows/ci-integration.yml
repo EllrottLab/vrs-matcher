@@ -20,8 +20,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Install Python
+        run: uv python install 3.13
+
       - name: Install integration dependencies
-        run: uv sync --group dev --group integration
+        run: uv sync --python 3.13 --group dev --group integration
 
       - name: Cache seqrepo
         id: cache-seqrepo
