@@ -1,0 +1,18 @@
+##fileformat=VCFv4.2
+##reference=synthetic-test-reference
+##vrs_annotation=synthetic-test-1
+##contig=<ID=chr1,length=1000,refget=ga4gh:SQ.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA>
+##FILTER=<ID=q10,Description="Failed quality">
+##INFO=<ID=VRS_Allele_IDs,Number=A,Type=String,Description="Synthetic test IDs, not genomic identifiers">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Depth">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	A	B
+chr1	1	.	A	C	.	PASS	VRS_Allele_IDs=ga4gh:VA.00000000000000000000000000000001	GT:GQ:DP	0/1:20:10	0/1:20:10
+chr1	2	.	A	C	.	PASS	VRS_Allele_IDs=ga4gh:VA.00000000000000000000000000000002	GT:GQ:DP	0/1:20:10	0/1:20:10
+chr1	3	.	A	C	.	PASS	VRS_Allele_IDs=ga4gh:VA.00000000000000000000000000000003	GT:GQ:DP	0/1:20:10	0/1:20:10
+chr1	4	.	A	C	.	PASS	VRS_Allele_IDs=ga4gh:VA.00000000000000000000000000000004	GT:GQ:DP	0/1:20:10	0/0:20:10
+chr1	5	.	A	C	.	PASS	VRS_Allele_IDs=ga4gh:VA.00000000000000000000000000000005	GT:GQ:DP	0/0:20:10	0/1:20:10
+chr1	6	.	A	C	.	PASS	VRS_Allele_IDs=ga4gh:VA.00000000000000000000000000000006	GT:GQ:DP	0/0:20:10	0/1:20:10
+chr1	7	.	A	C	.	PASS	VRS_Allele_IDs=ga4gh:VA.00000000000000000000000000000007	GT:GQ:DP	0/0:20:10	0/1:20:10
+chr1	8	.	A	C	.	PASS	VRS_Allele_IDs=ga4gh:VA.00000000000000000000000000000008	GT:GQ:DP	0/0:20:10	1/1:20:10

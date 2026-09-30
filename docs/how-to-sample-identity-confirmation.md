@@ -13,7 +13,7 @@ Use this when you need to:
 
 ## Prerequisites
 
-- Python 3.12+ and `uv`
+- Python 3.13+ and `uv`
 - `vrs-matcher` installed (`uv sync` in this repository)
 - VCFs annotated with INFO field `VRS_Allele_IDs`
 
@@ -109,4 +109,3 @@ thresholds using known positives/negatives.
   annotated consistently and loaded with comparable filtering.
 - Unexpectedly merged/overwritten behavior: check for reused sample IDs across
   files and rename before ingestion if separate identities are needed.
-

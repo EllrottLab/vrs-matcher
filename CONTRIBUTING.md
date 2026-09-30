@@ -9,7 +9,7 @@ Install [uv](https://docs.astral.sh/uv/), then:
 ```bash
 git clone https://github.com/ohsu-comp-bio/vrs-matcher.git
 cd vrs-matcher
-uv sync --all-groups
+uv sync --python 3.13 --all-groups
 ```
 
 If you plan to run the real-data integration test, install the integration
@@ -17,7 +17,7 @@ group and a local [seqrepo](https://github.com/biocommons/biocommons.seqrepo)
 data instance:
 
 ```bash
-uv sync --group dev --group integration
+uv sync --python 3.13 --group dev --group integration
 
 # one-time seqrepo download (~10 GB, cached across runs)
 scripts/setup_integration_data.sh

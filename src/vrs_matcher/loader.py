@@ -99,7 +99,7 @@ def _format_scalar(arr, sample_idx: int) -> float | int | None:
     if arr is None:
         return None
     val = arr[sample_idx][0]
-    if isinstance(val, float) and val != val:  # NaN
+    if val != val:  # NaN, including numpy floating-point scalars.
         return None
     if val == _MISSING_INT:
         return None
@@ -225,7 +225,9 @@ def load_samples(
     dp_threshold: int = DEFAULT_DP_THRESHOLD,
     include_no_call: bool = False,
     candidate_vrs_ids: set[str] | None = None,
-) -> int:
+    index_genotypes: bool = False,
+    panel: str | Path | None = None,
+) -> int | dict:
     """Load a VRS-annotated VCF into the SQLite sample-allele index.
 
     Args:
@@ -236,10 +238,32 @@ def load_samples(
         dp_threshold: Minimum DP threshold when DP exists.
         include_no_call: Whether to include NO_CALL genotypes.
         candidate_vrs_ids: Optional allowlist of VRS IDs.
+        index_genotypes: Also index explicit called SNP genotypes atomically for KING.
+        panel: Declared panel TSV, required with ``index_genotypes``.
 
     Returns:
-        Number of allele rows inserted.
+        Number of allele rows inserted, or an ingestion summary for genotype indexing.
     """
+
+    if index_genotypes:
+        from .genotypes import load_genotypes
+
+        if panel is None:
+            raise ValueError("--index-genotypes requires --panel.")
+        if candidate_vrs_ids is not None or include_no_call:
+            raise ValueError(
+                "Use the declared panel for genotype indexing, without legacy filters."
+            )
+        return load_genotypes(
+            vcf_path,
+            db_path,
+            panel,
+            source_dataset=source_dataset,
+            gq=gq_threshold,
+            dp=dp_threshold,
+        )
+    if panel is not None:
+        raise ValueError("--panel requires --index-genotypes.")
 
     _BATCH = 10_000
     conn = open_db(db_path)

@@ -70,7 +70,7 @@ comparisons. Plugins replace scoring and ranking after ingestion.
 | [plugins.py](../src/vrs_matcher/plugins.py) | Plugin contract, context helpers, discovery, validation, and resolution. |
 
 Runtime dependencies are Click and `cyvcf2`, plus Python's standard-library
-SQLite support. Python 3.12 or later is required. VRS annotation dependencies
+SQLite support. Python 3.13 or later is required. VRS annotation dependencies
 are in the optional integration dependency group.
 
 ## 3. Implementation: what is indexed?
@@ -215,7 +215,7 @@ their presence does not make them built-in features.
 
 ## 6. Tutorial: run a complete local example
 
-Run commands from the repository root in Bash with Python 3.12+ and `uv`
+Run commands from the repository root in Bash with Python 3.13+ and `uv`
 available. The bundled input already contains illustrative VRS-style IDs;
 no reference download or annotation service is needed for this tutorial.
 These shortened IDs are teaching fixtures, not computed identifiers for reuse

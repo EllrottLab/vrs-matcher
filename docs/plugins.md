@@ -19,8 +19,9 @@ A plugin changes how samples are scored and ranked after data are loaded
 into the SQLite index. It operates on indexed sample-level allele/genotype
 data, not raw VCF records.
 
-Plugins do not replace VCF parsing, VRS allele extraction, SQLite storage,
-or the `MatchResult` output structure.
+Plugins do not replace VCF parsing, VRS allele extraction, or SQLite storage.
+The built-in `king-robust` plugin requires the optional called-genotype index;
+see the [KING guide](how-to-king-robust.md) for panel preparation and result types.
 
 ## Plugin sources and selection
 
@@ -28,7 +29,7 @@ There are three plugin sources, selected on the command line:
 
 | Source | How to select | Notes |
 | --- | --- | --- |
-| Built-in (shipped with `vrs-matcher`) | `--algorithm identity` | |
+| Built-in (shipped with `vrs-matcher`) | `--algorithm identity` or `--algorithm king-robust` | KING requires genotype indexing. |
 | Entry-point (from an installed package) | `--algorithm my-plugin` | See [Packaging](#packaging-a-reusable-plugin) |
 | Local script (a `.py` file) | `--plugin-file my_plugin.py` | Usually no `--algorithm` needed |
 
@@ -92,8 +93,13 @@ A plugin object must define:
 
 - `name`: unique plugin name, e.g. `"identity"` or `"rare-priority"`
 - `api_version`: currently `"1"` (use `PLUGIN_API_VERSION`)
-- `match_pair(context, sample_a, sample_b, *, candidate_vrs_ids=None) -> MatchResult`
-- `match_against_all(context, sample_id, *, top_n=None, candidate_vrs_ids=None) -> list[MatchResult]`
+- `match_pair(context, sample_a, sample_b, *, candidate_vrs_ids=None) -> MatchResult | KinshipResult`
+- `match_against_all(context, sample_id, *, top_n=None, candidate_vrs_ids=None) -> list[MatchResult] | KinshipMatches`
+
+API version 1 remains supported: existing identity-style plugins keep their
+original return types. Kinship plugins can return `KinshipResult` and
+`KinshipMatches` from `vrs_matcher.models`; the CLI renders these explicitly.
+External callers that select a kinship plugin must handle those result types.
 
 A script plugin file must also define `create_plugin()`, returning the plugin
 object.
@@ -111,6 +117,10 @@ Available helpers:
 - `context.get_vrs_ids(sample_id)`
 - `context.get_genotype_states(sample_id)`
 - `context.list_samples()`
+- `context.get_genotype_panel()` — panel hash, reference, annotation, and QC metadata
+- `context.get_panel_ids()` — all declared markers, including reference-only loci
+- `context.get_called_genotypes(sample_id)` — passing ALT dosage 0/1/2 by marker;
+  missing rows mean unknown. Raises a re-ingestion error for allele-only samples.
 
 ### Output: the `MatchResult`
 
@@ -121,6 +131,11 @@ Plugins return `MatchResult` objects (from `vrs_matcher.matcher`), populating:
 > **Note:** the CLI and notebook interfaces report the primary score from the
 > `jaccard` field. If your algorithm is not truly Jaccard-based and you reuse
 > that field for a custom score, document it clearly for users.
+
+KING uses dedicated result types rather than repurposing identity fields.
+`KinshipMatches.matches` contains the scored top-N; `.unscorable` contains
+all unscorable peers separately. `--json` preserves full precision for either
+result family. `shared-variants` requires an allele result and rejects KING.
 
 ## Minimal script plugin template
 

@@ -13,7 +13,7 @@ Use this when you need to:
 
 ## Prerequisites
 
-- Python 3.12+ and `uv`
+- Python 3.13+ and `uv`
 - `vrs-matcher` installed (`uv sync` in this repository)
 - VCFs annotated with INFO field `VRS_Allele_IDs`
 
@@ -109,4 +109,3 @@ known positives and known negatives from your program.
   VRS annotated consistently and loaded with comparable filtering.
 - Missing matches because of reused sample IDs: rename or prefix one release so
   duplicate biological samples can coexist in the same index.
-
