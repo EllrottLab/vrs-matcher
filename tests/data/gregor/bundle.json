@@ -1,0 +1,30 @@
+{
+  "model_version": "1.12",
+  "genetic": {
+    "artifact_id": "synthetic-king",
+    "sha256": "SET_AFTER_INDEX_BUILD"
+  },
+  "sources": [
+    {
+      "source_id": "synthetic",
+      "participant": {
+        "path": "participant.tsv",
+        "sha256": "adbe1532783092bcc0a3b0711906e7ab5ee6e2ebb62479ed5b668d6e08f5049f"
+      },
+      "phenotype": {
+        "path": "phenotype.tsv",
+        "sha256": "f86144877e5c2eaa107b0691a30151f7a6443fe38dea51b23cb16c1faebbed2c"
+      },
+      "mapping": {
+        "path": "mapping.tsv",
+        "sha256": "21672659efe8decac976936d0bb9b8d498a1be48f9414909d400641c5d28b631"
+      }
+    }
+  ],
+  "provenance": {
+    "synthetic": true,
+    "generator_version": 1,
+    "participants": 6,
+    "assertions_per_person": 1
+  }
+}

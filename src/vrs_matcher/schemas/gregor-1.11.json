@@ -1,0 +1,635 @@
+{
+  "version": "1.11",
+  "upstream_sha256": "acce7f251f558da24444ddd258bbb8f157fd1d9b86b9abdd77909a07fc5fb0e9",
+  "tables": {
+    "participant": [
+      {
+        "column": "participant_id",
+        "primary_key": true,
+        "required": true,
+        "description": "Subject/Participant Identifier (primary key)",
+        "data_type": "string",
+        "examples": [
+          "BCM_Subject_1",
+          "BROAD_subj89054"
+        ],
+        "notes": "anticipate using RC-assigned ID prefixed by gregor_center value"
+      },
+      {
+        "column": "internal_project_id",
+        "description": "An identifier used by GREGoR research centers to identify a set of participants for their internal tracking",
+        "data_type": "string",
+        "multi_value_delimiter": "|",
+        "examples": [
+          "UWCDR_uwcmg_distal_arthrogryposis_type 1_212",
+          "UWCDR_uwcmg_sponastrime_dysplasia_487"
+        ]
+      },
+      {
+        "column": "gregor_center",
+        "required": true,
+        "description": "GREGoR Center to which the participant is originally associated",
+        "data_type": "enumeration",
+        "enumerations": [
+          "BCM",
+          "BROAD",
+          "CNH_I",
+          "UCI",
+          "UW_CRDR",
+          "GSS",
+          "UW_DCC",
+          "ILMN-IHOPE"
+        ]
+      },
+      {
+        "column": "consent_code",
+        "required": true,
+        "description": "Consent group pertaining to this participant's data",
+        "data_type": "enumeration",
+        "enumerations": [
+          "GRU",
+          "HMB"
+        ],
+        "examples": "GRU"
+      },
+      {
+        "column": "recontactable",
+        "description": "Is the originating GREGoR Center likely able to recontact this participant",
+        "data_type": "enumeration",
+        "enumerations": [
+          "Yes",
+          "No"
+        ]
+      },
+      {
+        "column": "prior_testing",
+        "description": "Text description of any genetic testing for individual conducted prior to enrollment",
+        "data_type": "string",
+        "multi_value_delimiter": "|",
+        "examples": "Normal karyotype | FBN2 screened clinically"
+      },
+      {
+        "column": "pmid_id",
+        "description": "Case specific PubMed ID if applicable",
+        "data_type": "string",
+        "multi_value_delimiter": "|",
+        "examples": "25683120",
+        "notes": "Publication which included participant;  Used for publications which include participant known prior to or after inclusion in GREGoR"
+      },
+      {
+        "column": "family_id",
+        "required": true,
+        "description": "Identifier for family",
+        "data_type": "string",
+        "references": "> family.family_id",
+        "examples": [
+          "CNH-I_fam89052",
+          "UW_CRDR_Family_2"
+        ]
+      },
+      {
+        "column": "paternal_id",
+        "required": true,
+        "description": "participant_id for father; 0 if not available",
+        "data_type": "string",
+        "examples": [
+          "BCM_Subject_1",
+          "BROAD_subj89054"
+        ],
+        "notes": "intent is to be able to create .ped file format from consortium data;   Can enter 0 for mother or father not present"
+      },
+      {
+        "column": "maternal_id",
+        "required": true,
+        "description": "participant_id for mother; 0 if not available",
+        "data_type": "string",
+        "examples": [
+          "BCM_Subject_1",
+          "BROAD_subj89054"
+        ],
+        "notes": "intent is to be able to create .ped file format from consortium data;   Can enter 0 for mother or father not present"
+      },
+      {
+        "column": "twin_id",
+        "description": "participant_id for twins, triplets, etc; 0 if not available",
+        "data_type": "string",
+        "multi_value_delimiter": "|",
+        "examples": [
+          "BCM_Subject_1",
+          "BROAD_subj89054",
+          "BROAD_subj89054|BROAD_subj89055"
+        ],
+        "notes": "may be monozygotic, dizygotic, or polyzygotic"
+      },
+      {
+        "column": "proband_relationship",
+        "required": true,
+        "description": "Text description of individual relationship to proband in family, especially useful to capture relationships when connecting distant relatives and connecting relatives not studied",
+        "data_type": "enumeration",
+        "enumerations": [
+          "Self",
+          "Mother",
+          "Father",
+          "Sibling",
+          "Child",
+          "Maternal Half Sibling",
+          "Paternal Half Sibling",
+          "Maternal Grandmother",
+          "Maternal Grandfather",
+          "Paternal Grandmother",
+          "Paternal Grandfather",
+          "Maternal Aunt",
+          "Maternal Uncle",
+          "Paternal Aunt",
+          "Paternal Uncle",
+          "Niece",
+          "Nephew",
+          "Maternal 1st Cousin",
+          "Paternal 1st Cousin",
+          "Other",
+          "Unknown"
+        ],
+        "examples": "Mother",
+        "notes": "limit enumerated fields to values in seqr, and use the proband_relationship_detail for other options"
+      },
+      {
+        "column": "proband_relationship_detail",
+        "description": "Other proband relationship not captured in enumeration above",
+        "data_type": "string",
+        "examples": [
+          "Third cousins, through mother's side",
+          "Father's brother's nephew's cousin's former roommate"
+        ],
+        "notes": "keeping because not all relationships can be captured in proband_relationship (a way to describe 'other')"
+      },
+      {
+        "column": "sex",
+        "required": true,
+        "description": "Biological sex assigned at birth (aligned with All of Us). If individual has a known DSD / not expected sex chromosome karyotype, this can be noted in the sex_detail field.",
+        "data_type": "enumeration",
+        "enumerations": [
+          "Female",
+          "Male",
+          "Unknown"
+        ]
+      },
+      {
+        "column": "sex_detail",
+        "description": "Optional free-text field to describe known discrepancies between 'sex' value (female=>XX, male=>XY) and actual sex chromosome karyotype or other relevant details",
+        "data_type": "string",
+        "examples": [
+          "XXY expected",
+          "XY expected [for someone assigned female at birth with XY DSD]"
+        ]
+      },
+      {
+        "column": "reported_race",
+        "description": "Self/submitter-reported race (OMB categories)",
+        "data_type": "enumeration",
+        "enumerations": [
+          "American Indian or Alaska Native",
+          "Asian",
+          "Black or African American",
+          "Native Hawaiian or Other Pacific Islander",
+          "Middle Eastern or North African",
+          "White"
+        ],
+        "multi_value_delimiter": "|"
+      },
+      {
+        "column": "reported_ethnicity",
+        "description": "Self/submitter-reported ethnicity (OMB categories)",
+        "data_type": "enumeration",
+        "enumerations": [
+          "Hispanic or Latino",
+          "Not Hispanic or Latino"
+        ]
+      },
+      {
+        "column": "ancestry_detail",
+        "description": "Additional specific ancestry description free text beyond what is captured by OMB race/ethnicity categories",
+        "data_type": "string",
+        "examples": [
+          "Polish",
+          "Amish",
+          "Ashkenazi Jewish"
+        ]
+      },
+      {
+        "column": "age_at_last_observation",
+        "description": "Age at last observation, aka age in years at the last time the center can vouch for the accuracy phenotype data. For conditions with later age of onset, this field lets users know if individuals marked as unaffected were younger or older than the age when the phenotype is expected to appear.",
+        "data_type": "float",
+        "examples": [
+          "21",
+          "32"
+        ]
+      },
+      {
+        "column": "affected_status",
+        "required": true,
+        "description": "Indicate affected status of individual (overall with respect to primary phenotype in the family). Note: Affected participants must have entry in phenotype table.",
+        "data_type": "enumeration",
+        "enumerations": [
+          "Affected",
+          "Unaffected",
+          "Possibly affected",
+          "Unknown"
+        ],
+        "notes": "useful from a ped file point of view;\ngeneral agreement to keep; phenotype table captures details and this is an overall status"
+      },
+      {
+        "column": "phenotype_description",
+        "description": "human-readable 'Phenotypic one-line summary' for why this individual is of interest. Could be the same as the term_details value in the Phenotype table. Strongly encourage/required for proband.",
+        "data_type": "string",
+        "multi_value_delimiter": "|",
+        "examples": [
+          "Missing one variant in gene XXX",
+          "Distal arthrogryposis with stellate teeth"
+        ],
+        "notes": "For unaffected/relatives, can note 'parent of ...' or 'relative of ...'"
+      },
+      {
+        "column": "age_at_enrollment",
+        "description": "age in years at which consent was originally obtained",
+        "data_type": "float",
+        "examples": "42"
+      },
+      {
+        "column": "solve_status",
+        "required": true,
+        "description": "Indication of whether the submitting RC considers this case 'solved'",
+        "data_type": "enumeration",
+        "enumerations": [
+          "Solved",
+          "Partially solved",
+          "Probably solved",
+          "Unsolved",
+          "Unaffected"
+        ],
+        "examples": "Partially solved",
+        "notes": "See https://docs.google.com/document/d/1Qg-wjF34F3h4pyMjFNQcDP5-PvmlOh0HxDEDR8DyexE"
+      },
+      {
+        "column": "missing_variant_case",
+        "required": true,
+        "description": "Indication of whether this is known to be a missing variant case, see notes for a description of the Missing Variant Project and inclusion criteria.",
+        "data_type": "enumeration",
+        "enumerations": [
+          "Yes",
+          "No",
+          "Unknown"
+        ],
+        "notes": "The goal of the Missing Variant Project (MVP) is to identify a cohort of cases for which there is an extremely high expectation of the presence of one or two 'missing' pathogenic variants within a narrow and specific search space, i.e. a single gene/locus of interest for which the known phenotype is the suspected/likely diagnosis for the affected individual.\n\nMVP cases can include both those initially ascertained prospectively based on expectation of a missing pathogenic variant and those ascertained retrospectively after analysis identifies an expectation of a missing pathogenic variant within a narrow search space.\n\nThe case should meet one of the following criteria:\n- Has a LP/P variant identified in a gene underlying a recessive condition consistent with the phenotype observed in the patient, and suspected to be the correct diagnosis, for which a second explanatory LP/P variant has not been identified by prior genetic testing\n- Has a specific clinical diagnosis supported by evidence (e.g. biochemical testing) for a dominant condition known to be of single gene etiology for which an explanatory LP/P variant has not been identified by prior genetic testing(very uncommon) \n- Has no LP/P variants in a gene underlying a recessive condition consistent with the phenotype observed in the patient and the recessive condition is associated with a specific clinical diagnosis and has only been attributed to variants in a single gene (e.g. an individual clinically diagnosed with cystic fibrosis but no variants identified in CFTR)\n\nAny cases with potentially explanatory VUS identified as the 'missing variant,' are eligible and should be included (e.g. an individual with a LP/P variant and VUS in trans identified in a gene underlying a recessive condition consistent with the phenotype observed should be flagged for MVP)."
+      },
+      {
+        "column": "missing_variant_details",
+        "description": "For missing variant cases, indicate gene(s) or region of interest and reason for inclusion in MVP.",
+        "data_type": "string",
+        "examples": [
+          "Werner syndrome case with single pathogenic hit in WRN",
+          "Clinical diagnosis of Marfan syndrome with no pathogenic or likely pathogenic variant identified in FBN1",
+          "Clinical diagnosis of neurofibromatosis type 1 with no pathogenic or likely pathogenic variant identified in NF1"
+        ]
+      }
+    ],
+    "phenotype": [
+      {
+        "column": "phenotype_id",
+        "primary_key": true,
+        "description": "Identifier for phenotype (primary key), automatically generated as part of data deposition",
+        "data_type": "string",
+        "references": "from: participant_id, term_id, presence",
+        "notes": "This ID generated when loading into AnVIL data table and is not included in the uploaded .tsv file"
+      },
+      {
+        "column": "participant_id",
+        "required": true,
+        "description": "Subject/Participant Identifier",
+        "data_type": "string",
+        "references": "> participant.participant_id",
+        "examples": [
+          "BCM_Subject_1",
+          "BROAD_subj89054"
+        ]
+      },
+      {
+        "column": "term_id",
+        "required": true,
+        "description": "The phenotype code, including prefix, from a defined ontology. The specific ontology used is named in the ontology field.",
+        "data_type": "string",
+        "examples": [
+          "HP:0001627",
+          "MONDO:0003847"
+        ]
+      },
+      {
+        "column": "presence",
+        "required": true,
+        "description": "Indicate whether the indicated phenotype is present in this participant.",
+        "data_type": "enumeration",
+        "enumerations": [
+          "Present",
+          "Absent",
+          "Unknown"
+        ]
+      },
+      {
+        "column": "ontology",
+        "required": true,
+        "description": "Which ontology does the term_id field entry come from?",
+        "data_type": "enumeration",
+        "enumerations": [
+          "HPO",
+          "MONDO",
+          "OMIM",
+          "ORPHANET",
+          "SNOMED",
+          "ICD10"
+        ],
+        "notes": "HPO (requirement that phenotype must be described in HPO)\nMONDO (optional)\nOMIM (opt)\nORPHANET (opt)\nSNOMED (opt)\nICD10 (opt)"
+      },
+      {
+        "column": "additional_details",
+        "description": "modifier of a term where the additional details are not supported/available as a term in HPO",
+        "data_type": "string",
+        "examples": "intellectual disability, no IQ test but 3rd grade reading level at 15 years old"
+      },
+      {
+        "column": "onset_age_range",
+        "description": "The onset age range for the phenotype. Allowable values are subterms of 'Onset' HP:0003674.",
+        "data_type": "enumeration",
+        "enumerations": [
+          "HP:0003581",
+          "HP:0030674",
+          "HP:0011463",
+          "HP:0003577",
+          "HP:0025708",
+          "HP:0011460",
+          "HP:0011461",
+          "HP:0003593",
+          "HP:0025709",
+          "HP:0003621",
+          "HP:0034199",
+          "HP:0003584",
+          "HP:0025710",
+          "HP:0003596",
+          "HP:0003623",
+          "HP:0410280",
+          "HP:4000040",
+          "HP:0034198",
+          "HP:0034197",
+          "HP:0011462"
+        ],
+        "notes": "values are subterm of 'Onset' HP:0003674 - specifically,\nHP:0003581 | Adult onset\nHP:0030674 | Antenatal onset\nHP:0011463 | Childhood onset\nHP:0003577 | Congenital onset\nHP:0025708 | Early young adult onset\nHP:0011460 | Embryonal onset\nHP:0011461 | Fetal onset\nHP:0003593 | Infantile onset\nHP:0025709 | Intermediate young adult onset\nHP:0003621 | Juvenile onset\nHP:0034199 | Late first trimester onset\nHP:0003584 | Late onset\nHP:0025710 | Late young adult onset\nHP:0003596 | Middle age onset\nHP:0003623 | Neonatal onset\nHP:0410280 | Pediatric onset\nHP:4000040 | Puerpural onset\nHP:0034198 | Second trimester onset\nHP:0034197 | Third trimester onset\nHP:0011462 | Young adult onset"
+      },
+      {
+        "column": "additional_modifiers",
+        "description": "Human Phenotype Ontology (HPO) modifiers used to detail phenotypic aspects of the phenotype named with the term_id field (like age of onset or severity).",
+        "data_type": "enumeration",
+        "enumerations": [
+          "HP:0025292",
+          "HP:0011009",
+          "HP:0025308",
+          "HP:0025307",
+          "HP:0025306",
+          "HP:0003581",
+          "HP:0011420",
+          "HP:0003831",
+          "HP:0025285",
+          "HP:0032525",
+          "HP:0025286",
+          "HP:0025254",
+          "HP:0032526",
+          "HP:0025257",
+          "HP:0032503",
+          "HP:0025256",
+          "HP:0032522",
+          "HP:0025255",
+          "HP:0030674",
+          "HP:0033820",
+          "HP:4000052",
+          "HP:0025287",
+          "HP:0012832",
+          "HP:0012827",
+          "HP:0033815",
+          "HP:0030645",
+          "HP:0033816",
+          "HP:0032535",
+          "HP:0011463",
+          "HP:0011010",
+          "HP:0031797",
+          "HP:0045088",
+          "HP:4000051",
+          "HP:4000048",
+          "HP:4000047",
+          "HP:0003577",
+          "HP:0011421",
+          "HP:0033763",
+          "HP:0003819",
+          "HP:0100613",
+          "HP:0001522",
+          "HP:0033765",
+          "HP:0033764",
+          "HP:0025294",
+          "HP:0020034",
+          "HP:4000053",
+          "HP:0012839",
+          "HP:0045089",
+          "HP:0025293",
+          "HP:0025302",
+          "HP:0025282",
+          "HP:0025708",
+          "HP:0011460",
+          "HP:0025303",
+          "HP:0032365",
+          "HP:0032502",
+          "HP:0032501",
+          "HP:0025315",
+          "HP:0032534",
+          "HP:0032542",
+          "HP:0032500",
+          "HP:0011461",
+          "HP:0031914",
+          "HP:0030650",
+          "HP:4000042",
+          "HP:0012837",
+          "HP:4000043",
+          "HP:0025295",
+          "HP:0003829",
+          "HP:0003593",
+          "HP:0003587",
+          "HP:0025709",
+          "HP:0032539",
+          "HP:0032540",
+          "HP:0003621",
+          "HP:0034199",
+          "HP:0003584",
+          "HP:0025710",
+          "HP:0025275",
+          "HP:0012831",
+          "HP:0012835",
+          "HP:0012838",
+          "HP:0025291",
+          "HP:0003596",
+          "HP:0030648",
+          "HP:0025279",
+          "HP:0012825",
+          "HP:0033817",
+          "HP:0045090",
+          "HP:0005268",
+          "HP:0012826",
+          "HP:0025296",
+          "HP:0040006",
+          "HP:0030651",
+          "HP:0003811",
+          "HP:0003623",
+          "HP:0025301",
+          "HP:0003680",
+          "HP:4000046",
+          "HP:0003674",
+          "HP:4000050",
+          "HP:0003679",
+          "HP:0025280",
+          "HP:0030647",
+          "HP:0033814",
+          "HP:0410280",
+          "HP:0030649",
+          "HP:0033813",
+          "HP:0033819",
+          "HP:0025304",
+          "HP:0030646",
+          "HP:0003812",
+          "HP:0031450",
+          "HP:0012830",
+          "HP:0032544",
+          "HP:0034241",
+          "HP:0012829",
+          "HP:0003676",
+          "HP:0025297",
+          "HP:0012840",
+          "HP:4000040",
+          "HP:0025305",
+          "HP:0003678",
+          "HP:0031796",
+          "HP:0031375",
+          "HP:0033818",
+          "HP:0012834",
+          "HP:0034198",
+          "HP:4000049",
+          "HP:0033349",
+          "HP:0012828",
+          "HP:0012824",
+          "HP:0025281",
+          "HP:0025284",
+          "HP:0003677",
+          "HP:0012836",
+          "HP:4000045",
+          "HP:0031915",
+          "HP:0003826",
+          "HP:0011011",
+          "HP:0011008",
+          "HP:0025283",
+          "HP:0034197",
+          "HP:0025153",
+          "HP:4000044",
+          "HP:0025204",
+          "HP:0033185",
+          "HP:0033032",
+          "HP:0500261",
+          "HP:0025205",
+          "HP:0025208",
+          "HP:0033789",
+          "HP:0025206",
+          "HP:0025207",
+          "HP:0025334",
+          "HP:0025211",
+          "HP:0025227",
+          "HP:0025377",
+          "HP:0025212",
+          "HP:0034060",
+          "HP:0025215",
+          "HP:0033793",
+          "HP:0025209",
+          "HP:0025213",
+          "HP:0025210",
+          "HP:0500260",
+          "HP:0025214",
+          "HP:0025216",
+          "HP:0025217",
+          "HP:0025218",
+          "HP:0033184",
+          "HP:0031167",
+          "HP:0025220",
+          "HP:0034195",
+          "HP:0031135",
+          "HP:0025221",
+          "HP:0025222",
+          "HP:0025223",
+          "HP:0025224",
+          "HP:0025225",
+          "HP:0025226",
+          "HP:0025228",
+          "HP:0025219",
+          "HP:0025229",
+          "HP:0033198",
+          "HP:0012833",
+          "HP:0025290",
+          "HP:0003828",
+          "HP:0003682",
+          "HP:0410401",
+          "HP:0011462",
+          "MONDO:0021125",
+          "MONDO:0021135",
+          "MONDO:0021139",
+          "MONDO:0021149",
+          "MONDO:0045034",
+          "MONDO:0045040",
+          "MONDO:0100355",
+          "MONDO:0700004",
+          "MONDO:0100369",
+          "MONDO:0700061",
+          "MONDO:0024488",
+          "MONDO:0021126",
+          "MONDO:0021136",
+          "MONDO:0021137",
+          "MONDO:0021140",
+          "MONDO:0021141",
+          "MONDO:0021151",
+          "MONDO:0021152",
+          "MONDO:0045036",
+          "MONDO:0045035",
+          "MONDO:0022202",
+          "MONDO:0045042",
+          "MONDO:0100356",
+          "MONDO:0100357",
+          "MONDO:0700005",
+          "MONDO:0700006",
+          "MONDO:0100427",
+          "MONDO:0100426",
+          "MONDO:0700063",
+          "MONDO:0700062",
+          "MONDO:0024489",
+          "MONDO:0021128",
+          "MONDO:0021127",
+          "MONDO:0024497",
+          "MONDO:0024495",
+          "MONDO:0024490",
+          "MONDO:0024496"
+        ],
+        "multi_value_delimiter": "|",
+        "notes": "this field should use the same ontology as above (e.g. Mondo disease characteristic if using mondo). \nIt should be a | delimited list of valid HPO IDs that are subordinate to HP:0012823 (clinical modifier) (For HPO terms) or a\n| delimited list of valid MONDO IDs that are subordinate to MONDO_0021125 (disease characteristic) (For MONDO terms)"
+      },
+      {
+        "column": "syndromic",
+        "description": "For participants with few HPO terms, this optional field is to provide context on whether it is likely the most notable phenotype or cohort level phenotype or whether the individual really only has one trait.",
+        "data_type": "enumeration",
+        "enumerations": [
+          "syndromic",
+          "non-syndromic"
+        ],
+        "examples": "non-syndromic",
+        "notes": "this field is intended to address a concern that if someone has only entered one trait/HPO term, there may be uncertainy about whether it is just the most notable phenotype or cohort level phenotype or whether the individual really only has one trait. For example, there could be a hearing loss cohort and someone might enter only 'sensorineural hearing loss' only, but an individual could have a syndromic hearing loss. Adding the syndromic/non-syndromic would provide a bit more assurance that if there are only one or two traits/HPO terms entered that there is not 'missing' traits/phenotype."
+      }
+    ]
+  }
+}
