@@ -124,6 +124,28 @@ Available integration tests:
     tests/integration/test_king_vcftools.py --run-integration
   ```
 
+- **Authorized GREGoR phenotype bundle** (`tests/integration/test_gregor.py`):
+  validates phenotype import, observation enrichment, and cohort selection
+  against already staged local data. This test does not download GREGoR data;
+  only run it in an approved environment with authorized inputs. Set:
+
+  ```bash
+  export VRS_MATCHER_GREGOR_INTEGRATION=1
+  export VRS_MATCHER_GREGOR_MANIFEST="/approved/path/manifest.json"
+  export VRS_MATCHER_GREGOR_DB="/approved/path/genetic-index.db"
+  export VRS_MATCHER_GREGOR_EXPECTED="/approved/path/expected-results.json"
+
+  uv run pytest tests/integration/test_gregor.py --run-integration
+  ```
+
+  `VRS_MATCHER_GREGOR_MANIFEST` points to the bundle JSON manifest; file paths
+  in it are resolved relative to the manifest's directory. `DB` is the verified
+  genetic index referenced by the manifest, and `EXPECTED` is JSON containing
+  the expected `sample_ids`, `observations`, `counts`, `predicate`, and
+  `cohort_sample_ids`. Enabling the test without valid paths or data fails
+  rather than silently skipping. Keep protected data and manifests in approved
+  storage; do not commit them or credentials.
+
 To run every integration test, configure seqrepo as above and make VCFtools
 available, then run:
 
