@@ -1,0 +1,6 @@
+participant_id	term_id	presence	ontology	additional_details
+P0	HP:0000001	Present	HPO	Invented test assertion
+P1	HP:0000001	Absent	HPO	Invented test assertion
+P2	HP:0000001	Unknown	HPO	Invented test assertion
+P3	HP:0000001	Present	HPO	Invented test assertion
+P4	HP:0000001	Absent	HPO	Invented test assertion

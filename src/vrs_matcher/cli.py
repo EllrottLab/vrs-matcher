@@ -108,6 +108,8 @@ def load_samples_cmd(
 @click.option(
     "--json", "json_output", is_flag=True, help="Full-precision machine-readable results."
 )
+@click.option("--phenotype-db", type=click.Path(exists=True, dir_okay=False))
+@click.option("--phenotype-snapshot")
 def match_samples_cmd(
     sample_a: str,
     sample_b: str,
@@ -115,6 +117,8 @@ def match_samples_cmd(
     algorithm: str,
     plugin_file: str | None,
     json_output: bool,
+    phenotype_db: str | None,
+    phenotype_snapshot: str | None,
 ) -> None:
     """Compute and print similarity metrics for two samples.
 
@@ -126,6 +130,31 @@ def match_samples_cmd(
     Returns:
         None.
     """
+
+    if bool(phenotype_db) != bool(phenotype_snapshot):
+        raise click.ClickException("Provide both --phenotype-db and --phenotype-snapshot.")
+    if phenotype_db:
+        from .phenotype_cli import checked, emit
+        from .phenotypes import match_report
+
+        report = checked(
+            match_report,
+            db,
+            phenotype_db,
+            phenotype_snapshot,
+            sample_a,
+            sample_b,
+            algorithm=algorithm,
+            plugin_file=plugin_file,
+        )
+        if json_output:
+            emit(report)
+        else:
+            click.echo("Genetic results:")
+            emit(report["genetic"])
+            click.echo("Phenotype context (separate from genetic scores):")
+            emit({k: v for k, v in report.items() if k != "genetic"})
+        return
 
     conn = open_db(db)
     try:
@@ -182,6 +211,13 @@ def match_samples_cmd(
 @click.option(
     "--json", "json_output", is_flag=True, help="Full-precision machine-readable results."
 )
+@click.option("--phenotype-db", type=click.Path(exists=True, dir_okay=False))
+@click.option("--phenotype-snapshot")
+@click.option("--phenotype-term", nargs=2, metavar="ONTOLOGY TERM_ID")
+@click.option(
+    "--phenotype-presence", default="Present", type=click.Choice(["Present", "Absent", "Unknown"])
+)
+@click.option("--exclude-phenotype-conflicts", is_flag=True)
 def match_sample_cmd(
     sample_id: str,
     against: str,
@@ -190,6 +226,11 @@ def match_sample_cmd(
     algorithm: str,
     plugin_file: str | None,
     json_output: bool,
+    phenotype_db: str | None,
+    phenotype_snapshot: str | None,
+    phenotype_term: tuple[str, str],
+    phenotype_presence: str,
+    exclude_phenotype_conflicts: bool,
 ) -> None:
     """Match one sample against all others and print ranked results.
 
@@ -202,6 +243,46 @@ def match_sample_cmd(
     Returns:
         None.
     """
+
+    if bool(phenotype_db) != bool(phenotype_snapshot):
+        raise click.ClickException("Provide both --phenotype-db and --phenotype-snapshot.")
+    if (
+        phenotype_term or exclude_phenotype_conflicts or phenotype_presence != "Present"
+    ) and not phenotype_db:
+        raise click.ClickException("Phenotype cohort options require a sidecar and snapshot.")
+    if (exclude_phenotype_conflicts or phenotype_presence != "Present") and not phenotype_term:
+        raise click.ClickException("A cohort presence/conflict policy requires --phenotype-term.")
+    if phenotype_db:
+        from .phenotype_cli import checked, emit
+        from .phenotypes import match_report
+
+        predicate = None
+        if phenotype_term:
+            predicate = dict(
+                ontology=phenotype_term[0],
+                term_id=phenotype_term[1],
+                presence=phenotype_presence,
+                exclude_conflicts=exclude_phenotype_conflicts,
+            )
+        report = checked(
+            match_report,
+            db,
+            phenotype_db,
+            phenotype_snapshot,
+            sample_id,
+            algorithm=algorithm,
+            plugin_file=plugin_file,
+            top_n=top,
+            predicate=predicate,
+        )
+        if json_output:
+            emit(report)
+        else:
+            click.echo("Genetic results:")
+            emit(report["genetic"])
+            click.echo("Phenotype context (separate from genetic scores):")
+            emit({k: v for k, v in report.items() if k != "genetic"})
+        return
 
     conn = open_db(db)
     try:
@@ -314,3 +395,8 @@ def plugins_list_cmd() -> None:
 
     for name in list_plugins():
         click.echo(name)
+
+
+from .phenotype_cli import register as _register_phenotypes  # noqa: E402
+
+_register_phenotypes(cli)
